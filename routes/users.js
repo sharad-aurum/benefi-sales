@@ -10,7 +10,7 @@ router.use(requireAuth);
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, name, email, role, avatar_color AS color, is_active, last_login, created_at FROM users ORDER BY name'
+      'SELECT id, name, email, role, avatar_color AS color, is_active, last_login, failed_attempts, locked_until, created_at FROM users ORDER BY name'
     );
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error.' }); }

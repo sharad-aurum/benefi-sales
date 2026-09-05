@@ -1280,7 +1280,10 @@ VIEWS.reports = async () => {
 // ── Users (admin) ──────────────────────────────────────────────────────────────
 VIEWS.users = async () => {
   if (!['admin','manager'].includes(state.user?.role)) { navigate('dashboard'); return; }
-  const users = await api.get('/api/users');
+  const [users, audit] = await Promise.all([
+    api.get('/api/users'),
+    state.user.role==='admin' ? api.get('/api/auth/audit').catch(()=>[]) : Promise.resolve([]),
+  ]);
   if (!users) return;
   document.getElementById('tb-actions').innerHTML = `${state.user.role==='admin'?'<button class="btn btn-p" onclick="openUserModal()">+ New User</button>':''}`;
   document.getElementById('view').innerHTML = `
@@ -1290,20 +1293,44 @@ VIEWS.users = async () => {
           <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr></thead>
           <tbody>
             ${users.map(u=>`<tr>
-              <td style="display:flex;align-items:center;gap:8px;padding:10px 14px">${av(u.name,u.color)} <span class="fw-7">${esc(u.name)}</span></td>
+              <td style="display:flex;align-items:center;gap:8px;padding:10px 14px">${av(u.name,u.color)} <span class="fw-7">${esc(u.name)}</span>${u.locked_until&&new Date(u.locked_until)>new Date()?'<span class="badge badge-cancelled" style="margin-left:6px">Locked</span>':''}</td>
               <td>${esc(u.email)}</td>
               <td><span class="badge role-${u.role}">${u.role}</span></td>
               <td><span class="badge badge-${u.is_active?'done':'cancelled'}">${u.is_active?'Active':'Inactive'}</span></td>
               <td>${fmtDateTime(u.last_login)}</td>
-              <td style="text-align:right">
+              <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;padding:8px 14px">
+                ${state.user.role==='admin'&&u.locked_until&&new Date(u.locked_until)>new Date()?`<button class="btn btn-d btn-sm" onclick="unlockUser(${u.id})">Unlock</button>`:''}
                 ${state.user.role==='admin'?`<button class="btn btn-g btn-sm" onclick="openUserModal(${u.id})">Edit</button>`:''}
               </td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+    ${state.user.role==='admin'&&audit?.length?`
+    <div class="section" style="margin-top:20px">
+      <div class="section-hd"><span class="section-title">Login Audit Log</span><span style="font-size:12px;color:var(--t3)">Last 200 attempts</span></div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Time</th><th>Email</th><th>User</th><th>IP Address</th><th>Result</th></tr></thead>
+          <tbody>
+            ${audit.map(a=>`<tr>
+              <td style="font-size:12px;white-space:nowrap">${fmtDateTime(a.created_at)}</td>
+              <td>${esc(a.email)}</td>
+              <td>${esc(a.user_name||'—')}</td>
+              <td style="font-family:monospace;font-size:12px">${esc(a.ip_address)}</td>
+              <td><span class="badge badge-${a.success?'done':'cancelled'}">${a.success?'Success':'Failed'}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`:''}`;
 };
+
+async function unlockUser(id) {
+  try { await api.post(`/api/auth/unlock/${id}`, {}); toast('Account unlocked'); navigate('users'); }
+  catch(e) { toast(e.message,'err'); }
+}
 
 async function openUserModal(id=null) {
   let u = {};
@@ -1551,6 +1578,7 @@ window.deleteTask = deleteTask;
 window.completeTask = completeTask;
 window.openUserModal = openUserModal;
 window.saveUser = saveUser;
+window.unlockUser = unlockUser;
 window.selectColor = selectColor;
 window.logout = logout;
 window.openPartnerModal = openPartnerModal;
