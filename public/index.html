@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BeneFi CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app-shell" style="display:none">
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="logo-mark">B</div>
+      <div>
+        <div class="logo-name">BeneFi</div>
+        <div class="logo-tag">Sales CRM</div>
+      </div>
+    </div>
+    <nav class="sb-nav" id="sb-nav">
+      <div class="nav-group">Main</div>
+      <div class="nav-item" data-view="dashboard"><span class="ni">⬡</span> Dashboard</div>
+      <div class="nav-item" data-view="pipeline"><span class="ni">⬕</span> Pipeline</div>
+      <div class="nav-group">CRM</div>
+      <div class="nav-item" data-view="deals"><span class="ni">◈</span> Deals</div>
+      <div class="nav-item" data-view="contacts"><span class="ni">◉</span> Contacts</div>
+      <div class="nav-item" data-view="companies"><span class="ni">▣</span> Companies</div>
+      <div class="nav-group">Activity</div>
+      <div class="nav-item" data-view="activities"><span class="ni">◎</span> Activities</div>
+      <div class="nav-item" data-view="tasks"><span class="ni">▷</span> Tasks <span class="nb" id="nb-tasks"></span></div>
+      <div class="nav-item" data-view="performance"><span class="ni">◑</span> My Performance</div>
+      <div class="nav-group">Insights</div>
+      <div class="nav-item" data-view="reports"><span class="ni">▲</span> Reports</div>
+      <div class="nav-item manager-up" data-view="team"><span class="ni">◕</span> Team Performance</div>
+      <div class="nav-group">Settings</div>
+      <div class="nav-item manager-up" data-view="partners"><span class="ni">◈</span> Partners</div>
+      <div class="nav-item admin-only" data-view="users"><span class="ni">⊕</span> Users</div>
+    </nav>
+    <div class="sb-user" id="sb-user"></div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-title" id="tb-title">Dashboard</div>
+      <div id="tb-actions"></div>
+    </header>
+    <div class="view-container" id="view"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-hd">
+      <span class="modal-title" id="modal-title"></span>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-ft"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
