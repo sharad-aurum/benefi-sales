@@ -36,8 +36,8 @@ const closeCls = d => { const n=daysTo(d); return n===null?'':n<0?'over':n<=7?'n
 
 function stageById(id) { return state.stages.find(s=>s.id==id)||{}; }
 
-const ACT_ICONS = { call:'📞', email:'✉️', meeting:'🤝', note:'📝', whatsapp:'💬' };
-const ACT_CLS   = { call:'act-call', email:'act-email', meeting:'act-meeting', note:'act-note', whatsapp:'act-whatsapp' };
+const ACT_ICONS = { call:'📞', email:'✉️', meeting:'🤝', note:'📝', whatsapp:'💬', proposal:'📄' };
+const ACT_CLS   = { call:'act-call', email:'act-email', meeting:'act-meeting', note:'act-note', whatsapp:'act-whatsapp', proposal:'act-proposal' };
 
 // ── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type='ok') {
@@ -1040,9 +1040,9 @@ VIEWS.activities = async () => {
     <div class="filter-bar">
       <select class="flt" onchange="filterActivities(this.value)">
         <option value="">All types</option>
-        <option value="call">📞 Calls</option><option value="email">✉️ Emails</option>
-        <option value="meeting">🤝 Meetings</option><option value="note">📝 Notes</option>
-        <option value="whatsapp">💬 WhatsApp</option>
+        <option value="call">📞 Calls</option><option value="meeting">🤝 Meetings</option>
+        <option value="proposal">📄 Proposals</option><option value="note">📝 Notes</option>
+        <option value="whatsapp">💬 WhatsApp</option><option value="email">✉️ Emails</option>
       </select>
     </div>
     <div class="section">
@@ -1082,9 +1082,12 @@ async function openActivityModal(dealId=null) {
     <div class="fgrid">
       <div class="fg"><label class="flbl">Type *</label>
         <select class="fsel" id="f-type">
-          <option value="call">📞 Call</option><option value="email">✉️ Email</option>
-          <option value="meeting">🤝 Meeting</option><option value="note">📝 Note</option>
+          <option value="call">📞 Call</option>
+          <option value="meeting">🤝 Meeting</option>
+          <option value="proposal">📄 Proposal Sent</option>
+          <option value="note">📝 Note</option>
           <option value="whatsapp">💬 WhatsApp</option>
+          <option value="email">✉️ Email</option>
         </select>
       </div>
       <div class="fg"><label class="flbl">Date & Time</label><input class="finp" id="f-date" type="datetime-local" value="${new Date(new Date()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"></div>
@@ -1728,7 +1731,7 @@ VIEWS.performance = async () => {
           <div class="perf-card-title">Activity vs Target</div>
           <div class="act-track-grid">
             ${actBar('Calls', act.call||0, q.calls_target||0)}
-            ${actBar('Emails', act.email||0, q.emails_target||0)}
+            ${actBar('Proposals', act.proposal||0, q.emails_target||0)}
             ${actBar('Meetings', act.meeting||0, q.meetings_target||0)}
             ${actBar('WhatsApp', act.whatsapp||0, 0, '#22C55E')}
             ${actBar('Notes', act.note||0, 0, '#6366F1')}
@@ -1845,7 +1848,7 @@ VIEWS.team = async () => {
       <td>₱${pfmt(u.pipeline_total)}<br><span style="font-size:11px;color:var(--t3)">₱${pfmt(u.pipeline_wtd)} wtd</span></td>
       <td>${u.calls}<span style="color:var(--t3)">/${u.calls_target}</span></td>
       <td>${u.meetings}<span style="color:var(--t3)">/${u.meetings_target}</span></td>
-      <td>${u.emails}<span style="color:var(--t3)">/${u.emails_target}</span></td>
+      <td>${u.proposals}<span style="color:var(--t3)">/${u.emails_target}</span></td>
       <td>${quotaBtn}</td>
     </tr>`;
   }).join('');
@@ -1869,7 +1872,7 @@ VIEWS.team = async () => {
             <thead><tr>
               <th>#</th><th>Rep</th><th>Attainment</th><th>Revenue</th><th>Gap</th>
               <th>Deals</th><th>Win Rate</th><th>Pipeline</th>
-              <th>Calls</th><th>Meetings</th><th>Emails</th><th></th>
+              <th>Calls</th><th>Meetings</th><th>Proposals</th><th></th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1915,7 +1918,7 @@ async function openQuotaModal(userId, periodStart, periodEnd, periodType='monthl
       <div class="fg"><label class="flbl">Meetings Target</label>
         <input class="finp" id="qm-meetings" type="number" placeholder="0" value="${existing?.meetings_target||''}"></div>
     </div>
-    <div class="fg"><label class="flbl">Emails Target</label>
+    <div class="fg"><label class="flbl">Proposals Target</label>
       <input class="finp" id="qm-emails" type="number" placeholder="0" value="${existing?.emails_target||''}"></div>
   `, `<div class="modal-ft-right">
     <button class="btn btn-g" onclick="closeModal()">Cancel</button>
@@ -1944,5 +1947,242 @@ async function saveQuota(){
   }catch(e){ toast(e.message,'err'); }
 }
 window.saveQuota = saveQuota;
+
+// ── Target Dashboard ──────────────────────────────────────────────────────────
+VIEW_TITLES.targets = 'Target Dashboard';
+
+let _tgtYear = new Date().getFullYear();
+let _tgtData  = null;
+
+VIEWS.targets = async () => {
+  if (!['admin','manager'].includes(state.user?.role)) { navigate('dashboard'); return; }
+  const v = document.getElementById('view');
+
+  // Year selector in topbar
+  const yearOpts = [-1,0,1].map(d => {
+    const y = new Date().getFullYear() + d;
+    return `<option value="${y}" ${y===_tgtYear?'selected':''}>${y}</option>`;
+  }).join('');
+  document.getElementById('tb-actions').innerHTML =
+    `<select class="flt" onchange="tgtSetYear(this.value)">${yearOpts}</select>`;
+
+  v.innerHTML = `<div style="text-align:center;padding:40px;color:var(--t3)">Loading…</div>`;
+  const data = await api.get(`/api/reports/targets?year=${_tgtYear}`);
+  if (!data) return;
+  _tgtData = data;
+
+  const { team, reps, months } = data;
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mLabel = m => MONTH_LABELS[parseInt(m.split('-')[1])-1] + ' ' + m.split('-')[0].slice(2);
+
+  // Totals for KPI cards
+  const tot = {
+    calls_a:   team.reduce((s,m)=>s+m.calls,0),
+    calls_t:   team.reduce((s,m)=>s+m.calls,0) , // will recalc below
+    meet_a:    team.reduce((s,m)=>s+m.meetings,0),
+    meet_t:    0,
+    email_a:   team.reduce((s,m)=>s+m.emails,0),
+    email_t:   0,
+    conv_a:    team.reduce((s,m)=>s+m.conversions,0),
+    conv_t:    0,
+    emp_a:     team.reduce((s,m)=>s+m.employees,0),
+  };
+  // sum targets from reps (quotas)
+  reps.forEach(rep => rep.months.forEach(m => {
+    tot.calls_t += m.calls_t;
+    tot.meet_t  += m.meetings_t;
+    tot.email_t += m.emails_t;
+    tot.conv_t  += m.conversions_t;
+  }));
+  // recalc calls_a properly
+  tot.calls_a = team.reduce((s,m)=>s+m.calls,0);
+
+  const ach = (a,t) => t>0 ? Math.round(a/t*100) : null;
+  const achColor = p => p==null?'var(--t3)':p>=100?'#16A34A':p>=70?'#D97706':'#DC2626';
+  const achBg    = p => p==null?'var(--s2)':p>=100?'rgba(22,163,74,.1)':p>=70?'rgba(217,119,6,.1)':'rgba(220,38,38,.08)';
+
+  // Heatmap cell color for activity counts (0=grey, low=yellow, mid=blue, high=green)
+  function heatCell(val, target) {
+    if (!target) return val > 0 ? 'rgba(59,130,246,.15)' : 'transparent';
+    const pct = val / target;
+    if (pct === 0) return 'transparent';
+    if (pct < 0.5)  return 'rgba(239,68,68,.15)';
+    if (pct < 0.8)  return 'rgba(245,158,11,.15)';
+    if (pct < 1.0)  return 'rgba(59,130,246,.18)';
+    return 'rgba(22,163,74,.18)';
+  }
+  function heatText(val, target) {
+    if (!target) return val > 0 ? '#3B82F6' : 'var(--t3)';
+    const pct = val / target;
+    if (pct === 0) return 'var(--t3)';
+    if (pct < 0.5)  return '#DC2626';
+    if (pct < 0.8)  return '#D97706';
+    if (pct < 1.0)  return '#2563EB';
+    return '#16A34A';
+  }
+
+  // KPI cards
+  const kpiCard = (label, actual, target, icon) => {
+    const p = ach(actual, target);
+    return `<div class="tgt-kpi">
+      <div class="tgt-kpi-icon">${icon}</div>
+      <div class="tgt-kpi-body">
+        <div class="tgt-kpi-lbl">${label}</div>
+        <div class="tgt-kpi-val">${actual.toLocaleString()}<span class="tgt-kpi-of"> / ${target>0?target.toLocaleString():'—'}</span></div>
+        ${target>0?`<div class="tgt-prog-track"><div class="tgt-prog-fill" style="width:${Math.min(p,100)}%;background:${achColor(p)}"></div></div>
+        <div class="tgt-kpi-pct" style="color:${achColor(p)}">${p}% of target</div>`:'<div class="tgt-kpi-pct" style="color:var(--t3)">No target set</div>'}
+      </div>
+    </div>`;
+  };
+
+  // Team monthly table
+  const teamTable = `
+    <div class="section" style="margin-top:20px">
+      <div class="section-hd"><span class="section-title">Team Monthly Tracker</span>
+        <span style="font-size:11.5px;color:var(--t3)">Actual vs Target · color = achievement</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tgt-table">
+          <thead>
+            <tr>
+              <th class="tgt-th-sticky">Month</th>
+              <th colspan="2">Calls</th>
+              <th colspan="2">Meetings</th>
+              <th colspan="2">Proposals</th>
+              <th colspan="2">Deals Won</th>
+              <th>Employees</th>
+              <th>Attainment</th>
+            </tr>
+            <tr class="tgt-sub-hd">
+              <th class="tgt-th-sticky"></th>
+              <th>Act</th><th>Tgt</th>
+              <th>Act</th><th>Tgt</th>
+              <th>Act</th><th>Tgt</th>
+              <th>Act</th><th>Tgt</th>
+              <th>Emp</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${team.map(m => {
+              // targets from rep quotas summed
+              const tCalls = reps.reduce((s,r)=>{ const rm=r.months.find(x=>x.month===m.month); return s+(rm?.calls_t||0); },0);
+              const tMeet  = reps.reduce((s,r)=>{ const rm=r.months.find(x=>x.month===m.month); return s+(rm?.meetings_t||0); },0);
+              const tEmail = reps.reduce((s,r)=>{ const rm=r.months.find(x=>x.month===m.month); return s+(rm?.emails_t||0); },0);
+              const tConv  = reps.reduce((s,r)=>{ const rm=r.months.find(x=>x.month===m.month); return s+(rm?.conversions_t||0); },0);
+              const overallPct = ach(m.calls+m.meetings, tCalls+tMeet);
+              const isFuture = m.month > new Date().toISOString().slice(0,7);
+              return `<tr class="${isFuture?'tgt-future':''}">
+                <td class="tgt-th-sticky tgt-month">${mLabel(m.month)}</td>
+                <td style="background:${heatCell(m.calls,tCalls)};color:${heatText(m.calls,tCalls)}" class="tgt-num">${m.calls||'—'}</td>
+                <td class="tgt-num tgt-t">${tCalls||'—'}</td>
+                <td style="background:${heatCell(m.meetings,tMeet)};color:${heatText(m.meetings,tMeet)}" class="tgt-num">${m.meetings||'—'}</td>
+                <td class="tgt-num tgt-t">${tMeet||'—'}</td>
+                <td style="background:${heatCell(m.emails,tEmail)};color:${heatText(m.emails,tEmail)}" class="tgt-num">${m.emails||'—'}</td>
+                <td class="tgt-num tgt-t">${tEmail||'—'}</td>
+                <td style="background:${heatCell(m.conversions,tConv)};color:${heatText(m.conversions,tConv)}" class="tgt-num">${m.conversions||'—'}</td>
+                <td class="tgt-num tgt-t">${tConv||'—'}</td>
+                <td class="tgt-num">${m.employees>0?m.employees.toLocaleString():'—'}</td>
+                <td class="tgt-num" style="font-weight:700;color:${achColor(overallPct)}">${overallPct!=null?overallPct+'%':'—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr class="tgt-total-row">
+              <td class="tgt-th-sticky">YTD Total</td>
+              <td class="tgt-num">${tot.calls_a.toLocaleString()}</td><td class="tgt-num tgt-t">${tot.calls_t.toLocaleString()}</td>
+              <td class="tgt-num">${tot.meet_a.toLocaleString()}</td><td class="tgt-num tgt-t">${tot.meet_t.toLocaleString()}</td>
+              <td class="tgt-num">${tot.email_a.toLocaleString()}</td><td class="tgt-num tgt-t">${tot.email_t.toLocaleString()}</td>
+              <td class="tgt-num">${tot.conv_a.toLocaleString()}</td><td class="tgt-num tgt-t">${tot.conv_t.toLocaleString()}</td>
+              <td class="tgt-num">${tot.emp_a.toLocaleString()}</td>
+              <td class="tgt-num" style="font-weight:800;color:${achColor(ach(tot.calls_a+tot.meet_a,tot.calls_t+tot.meet_t))}">${ach(tot.calls_a+tot.meet_a,tot.calls_t+tot.meet_t)??'—'}%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+
+  // Per-rep scorecard grid
+  const repCards = reps.map(rep => {
+    const totCalls = rep.months.reduce((s,m)=>s+m.calls,0);
+    const totMeet  = rep.months.reduce((s,m)=>s+m.meetings,0);
+    const totEmail = rep.months.reduce((s,m)=>s+m.emails,0);
+    const totConv  = rep.months.reduce((s,m)=>s+m.conversions,0);
+    const totEmp   = rep.months.reduce((s,m)=>s+m.employees,0);
+    const tCalls   = rep.months.reduce((s,m)=>s+m.calls_t,0);
+    const tMeet    = rep.months.reduce((s,m)=>s+m.meetings_t,0);
+    const tEmail   = rep.months.reduce((s,m)=>s+m.emails_t,0);
+    const tConv    = rep.months.reduce((s,m)=>s+m.conversions_t,0);
+    const pCalls   = ach(totCalls,tCalls);
+    const pMeet    = ach(totMeet,tMeet);
+    const pConv    = ach(totConv,tConv);
+    const overall  = ach(totCalls+totMeet+totEmail, tCalls+tMeet+tEmail);
+
+    // Monthly heatmap strip for calls
+    const heatStrip = rep.months.map(m => {
+      const p = m.calls_t>0 ? m.calls/m.calls_t : (m.calls>0?1:0);
+      const bg = p===0?'var(--s3)':p<0.5?'#FCA5A5':p<0.8?'#FCD34D':p<1?'#93C5FD':'#86EFAC';
+      const isFut = m.month > new Date().toISOString().slice(0,7);
+      return `<div class="tgt-heat-cell" style="background:${isFut?'var(--s2)':bg}" title="${mLabel(m.month)}: ${m.calls} calls"></div>`;
+    }).join('');
+
+    return `<div class="tgt-rep-card">
+      <div class="tgt-rep-hd">
+        ${av(rep.name, rep.color)}
+        <div>
+          <div class="tgt-rep-name">${esc(rep.name)}</div>
+          <div class="tgt-rep-ach" style="color:${achColor(overall)}">${overall!=null?overall+'% overall attainment':'No targets set'}</div>
+        </div>
+      </div>
+      <div class="tgt-heat-strip">${heatStrip}</div>
+      <div class="tgt-rep-metrics">
+        <div class="tgt-rm">
+          <div class="tgt-rm-lbl">Calls</div>
+          <div class="tgt-rm-val" style="color:${achColor(pCalls)}">${totCalls.toLocaleString()}</div>
+          <div class="tgt-rm-tgt">${tCalls>0?'/ '+tCalls.toLocaleString():''}</div>
+        </div>
+        <div class="tgt-rm">
+          <div class="tgt-rm-lbl">Meetings</div>
+          <div class="tgt-rm-val" style="color:${achColor(pMeet)}">${totMeet.toLocaleString()}</div>
+          <div class="tgt-rm-tgt">${tMeet>0?'/ '+tMeet.toLocaleString():''}</div>
+        </div>
+        <div class="tgt-rm">
+          <div class="tgt-rm-lbl">Proposals</div>
+          <div class="tgt-rm-val">${totEmail.toLocaleString()}</div>
+          <div class="tgt-rm-tgt">${tEmail>0?'/ '+tEmail.toLocaleString():''}</div>
+        </div>
+        <div class="tgt-rm">
+          <div class="tgt-rm-lbl">Deals Won</div>
+          <div class="tgt-rm-val" style="color:${achColor(pConv)}">${totConv.toLocaleString()}</div>
+          <div class="tgt-rm-tgt">${tConv>0?'/ '+tConv.toLocaleString():''}</div>
+        </div>
+        <div class="tgt-rm">
+          <div class="tgt-rm-lbl">Employees</div>
+          <div class="tgt-rm-val">${totEmp>0?totEmp.toLocaleString():'—'}</div>
+          <div class="tgt-rm-tgt"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  v.innerHTML = `
+    <div class="tgt-kpi-grid">
+      ${kpiCard('Calls Made',    tot.calls_a, tot.calls_t, '📞')}
+      ${kpiCard('Meetings Held', tot.meet_a,  tot.meet_t,  '🤝')}
+      ${kpiCard('Proposals Sent', tot.email_a, tot.email_t, '📄')}
+      ${kpiCard('Deals Won',     tot.conv_a,  tot.conv_t,  '🏆')}
+    </div>
+    ${teamTable}
+    <div class="section" style="margin-top:20px">
+      <div class="section-hd">
+        <span class="section-title">Rep Scorecards</span>
+        <span style="font-size:11.5px;color:var(--t3)">YTD · heat strip = monthly calls</span>
+      </div>
+      <div class="tgt-rep-grid">${repCards}</div>
+    </div>`;
+};
+
+window.tgtSetYear = function(y) { _tgtYear = parseInt(y); navigate('targets'); };
+window.tgtSetYear = window.tgtSetYear;
 
 init();

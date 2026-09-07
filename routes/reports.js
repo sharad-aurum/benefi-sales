@@ -107,4 +107,112 @@ router.get('/owners', requireRole('admin', 'manager'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error.' }); }
 });
 
+// Target dashboard — monthly actuals vs quotas per rep
+router.get('/targets', requireRole('admin', 'manager'), async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    // All active reps
+    const [reps] = await pool.execute(
+      `SELECT id, name, avatar_color AS color FROM users WHERE is_active=1 ORDER BY name`
+    );
+
+    // Monthly activity counts per user per type
+    const [actRows] = await pool.execute(
+      `SELECT user_id,
+              DATE_FORMAT(activity_date,'%Y-%m') AS month,
+              SUM(type='call')    AS calls,
+              SUM(type='meeting') AS meetings,
+              SUM(type='proposal') AS emails
+       FROM activities
+       WHERE YEAR(activity_date) = ?
+       GROUP BY user_id, month`, [year]
+    );
+
+    // Monthly won deals (conversions) + employees covered per user
+    const [wonRows] = await pool.execute(
+      `SELECT d.owner_id AS user_id,
+              DATE_FORMAT(d.updated_at,'%Y-%m') AS month,
+              COUNT(*) AS conversions,
+              COALESCE(SUM(d.employees_covered),0) AS employees
+       FROM deals d JOIN pipeline_stages ps ON d.stage_id=ps.id
+       WHERE ps.is_won=1 AND YEAR(d.updated_at)=?
+       GROUP BY d.owner_id, month`, [year]
+    );
+
+    // Quotas for the year
+    const [quotaRows] = await pool.execute(
+      `SELECT user_id, DATE_FORMAT(period_start,'%Y-%m') AS month,
+              calls_target, meetings_target, emails_target,
+              deals_target AS conversions_target, revenue_target
+       FROM quotas
+       WHERE YEAR(period_start)=? AND period_type='monthly'`, [year]
+    );
+
+    // Build month list
+    const months = Array.from({length:12},(_,i)=>{
+      const m = String(i+1).padStart(2,'0');
+      return `${year}-${m}`;
+    });
+
+    // Index lookups
+    const actMap  = {};  actRows.forEach(r  => { actMap[`${r.user_id}|${r.month}`]   = r; });
+    const wonMap  = {};  wonRows.forEach(r  => { wonMap[`${r.user_id}|${r.month}`]   = r; });
+    const quotMap = {};  quotaRows.forEach(r => { quotMap[`${r.user_id}|${r.month}`] = r; });
+
+    // Aggregate team-level quota targets (sum across all reps that have quotas)
+    const teamTargets = {};
+    months.forEach(m => {
+      teamTargets[m] = { calls:0, meetings:0, emails:0, conversions:0 };
+      reps.forEach(rep => {
+        const q = quotMap[`${rep.id}|${m}`] || {};
+        teamTargets[m].calls       += Number(q.calls_target||0);
+        teamTargets[m].meetings    += Number(q.meetings_target||0);
+        teamTargets[m].emails      += Number(q.emails_target||0);
+        teamTargets[m].conversions += Number(q.conversions_target||0);
+      });
+    });
+
+    // Build per-rep monthly grid
+    const repData = reps.map(rep => ({
+      ...rep,
+      months: months.map(m => {
+        const a = actMap[`${rep.id}|${m}`] || {};
+        const w = wonMap[`${rep.id}|${m}`] || {};
+        const q = quotMap[`${rep.id}|${m}`] || {};
+        return {
+          month:          m,
+          calls:          Number(a.calls||0),
+          meetings:       Number(a.meetings||0),
+          emails:         Number(a.emails||0),
+          conversions:    Number(w.conversions||0),
+          employees:      Number(w.employees||0),
+          calls_t:        Number(q.calls_target||0),
+          meetings_t:     Number(q.meetings_target||0),
+          emails_t:       Number(q.emails_target||0),
+          conversions_t:  Number(q.conversions_target||0),
+        };
+      }),
+    }));
+
+    // Team totals per month
+    const teamMonths = months.map(m => {
+      const tgt = teamTargets[m];
+      const actual = { calls:0, meetings:0, emails:0, conversions:0, employees:0 };
+      reps.forEach(rep => {
+        const a = actMap[`${rep.id}|${m}`] || {};
+        const w = wonMap[`${rep.id}|${m}`] || {};
+        actual.calls       += Number(a.calls||0);
+        actual.meetings    += Number(a.meetings||0);
+        actual.emails      += Number(a.emails||0);
+        actual.conversions += Number(w.conversions||0);
+        actual.employees   += Number(w.employees||0);
+      });
+      return { month: m, ...actual, ...tgt };
+    });
+
+    res.json({ year, months, reps: repData, team: teamMonths });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error.' }); }
+});
+
 export default router;

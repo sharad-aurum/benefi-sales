@@ -149,7 +149,7 @@ async function userMetrics(uid, ps, pe) {
     deals_won:      Number(won.deals_won) || 0,
     activities: {
       call:     actMap.call     || 0,
-      email:    actMap.email    || 0,
+      proposal: actMap.proposal  || 0,
       meeting:  actMap.meeting  || 0,
       note:     actMap.note     || 0,
       whatsapp: actMap.whatsapp || 0,
@@ -257,7 +257,7 @@ router.get('/team', requireRole('admin', 'manager'), async (req, res) => {
         pipeline_wtd:    Number(pipe?.wtd) || 0,
         calls:     actMap.call    || 0, calls_target:    quota?.calls_target    || 0,
         meetings:  actMap.meeting || 0, meetings_target: quota?.meetings_target || 0,
-        emails:    actMap.email   || 0, emails_target:   quota?.emails_target   || 0,
+        proposals: actMap.proposal || 0, emails_target:   quota?.emails_target   || 0,
         quota: quota || null,
       };
     }));
