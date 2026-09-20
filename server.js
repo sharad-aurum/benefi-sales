@@ -17,6 +17,7 @@ import taskRoutes      from './routes/tasks.js';
 import reportRoutes    from './routes/reports.js';
 import partnerRoutes      from './routes/partners.js';
 import performanceRoutes  from './routes/performance.js';
+import pricingRoutes      from './routes/pricing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
@@ -39,6 +40,7 @@ app.use('/api/tasks',      taskRoutes);
 app.use('/api/reports',    reportRoutes);
 app.use('/api/partners',     partnerRoutes);
 app.use('/api/performance',  performanceRoutes);
+app.use('/api/pricing',      pricingRoutes);
 
 // SPA — all non-API routes serve the login or app page
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));

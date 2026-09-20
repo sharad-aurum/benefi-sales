@@ -62,7 +62,7 @@ function closeModal(e) {
 window.closeModal = closeModal;
 
 // ── Router ───────────────────────────────────────────────────────────────────
-const VIEW_TITLES = { dashboard:'Dashboard', pipeline:'Pipeline', deals:'Deals', contacts:'Contacts', companies:'Companies', activities:'Activities', tasks:'Tasks', reports:'Reports', partners:'Partners', users:'Users', performance:'My Performance', team:'Team Performance' };
+const VIEW_TITLES = { dashboard:'Dashboard', pipeline:'Pipeline', deals:'Deals', contacts:'Contacts', companies:'Companies', activities:'Activities', tasks:'Tasks', reports:'Reports', partners:'Partners', users:'Users', performance:'My Performance', team:'Team Performance', targets:'Target Dashboard', pricing:'Pricing Dashboard' };
 
 const ROLE_LABELS  = { influencer:'Influencer', decision_maker:'Decision Maker', champion:'Champion', end_user:'End User', other:'Other' };
 const ROLE_COLORS  = { influencer:'#3B82F6', decision_maker:'#DC2626', champion:'#0F766E', end_user:'#9CA3AF', other:'#9CA3AF' };
@@ -561,21 +561,26 @@ async function openDealDetail(id) {
             <div><div class="mk">Probability</div><div class="mv">${deal.probability}%</div></div>
             <div><div class="mk">Close Date</div><div class="mv" style="color:${closeCls(deal.expected_close_date)==='over'?'#EF4444':closeCls(deal.expected_close_date)==='near'?'#F59E0B':'inherit'}">${fmtDate(deal.expected_close_date)}</div></div>
             <div><div class="mk">Go-Live Date</div><div class="mv">${fmtDate(deal.go_live_date)}</div></div>
+            ${deal.trial_start_date?`<div><div class="mk">Trial Start</div><div class="mv" style="color:#8B5CF6">${fmtDate(deal.trial_start_date)}</div></div>`:''}
+            ${deal.trial_end_date?`<div><div class="mk">Trial End</div><div class="mv" style="color:#8B5CF6">${fmtDate(deal.trial_end_date)}</div></div>`:''}
+            ${deal.lost_reason?`<div class="span2"><div class="mk">Lost Reason</div><div class="mv" style="color:#EF4444">${esc(deal.lost_reason)}</div></div>`:''}
             <div><div class="mk">Owner</div><div class="mv" style="display:flex;align-items:center;gap:6px">${av(deal.owner_name,deal.owner_color)} ${esc(deal.owner_name)}</div></div>
             <div><div class="mk">Source</div><div class="mv">${esc(deal.source||'—')}${deal.source_details?`<div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(deal.source_details)}</div>`:''}</div></div>
           </div>
 
-          ${(deal.employees_covered||deal.proposed_per_employee||deal.offered_per_employee||deal.discount_percent||deal.implementation_fee||deal.contract_months||deal.commercial_notes)?`
-          <div class="detail-sub-hd">Commercials</div>
+          ${(deal.employees_covered||deal.pricing_per_user||deal.proposed_per_employee||deal.discount_percent||deal.implementation_fee||deal.contract_months||deal.commercial_notes||deal.product_plan)?`
+          <div class="detail-sub-hd">Pricing &amp; Commercials</div>
+          ${deal.product_plan?`<div style="margin-bottom:10px"><span class="badge" style="background:#0F766E22;color:#0F766E;font-size:12px;padding:4px 10px">${esc(deal.product_plan)}</span></div>`:''}
           <div class="meta-grid">
             ${deal.employees_covered?`<div><div class="mk">Employees Covered</div><div class="mv">👥 ${Number(deal.employees_covered).toLocaleString()}</div></div>`:''}
-            ${deal.proposed_per_employee?`<div><div class="mk">Proposed / Emp / Month</div><div class="mv">₱${Number(deal.proposed_per_employee).toFixed(2)}</div></div>`:''}
-            ${(deal.employees_covered&&deal.proposed_per_employee)?`<div><div class="mk">Proposed MRR</div><div class="mv fw-7" style="color:var(--accent)">₱${Math.round(Number(deal.employees_covered)*Number(deal.proposed_per_employee)).toLocaleString()}/mo</div></div>`:''}
-            ${deal.offered_per_employee?`<div><div class="mk">Offered / Emp / Month</div><div class="mv" style="color:var(--accent)">₱${Number(deal.offered_per_employee).toFixed(2)}</div></div>`:''}
-            ${(deal.employees_covered&&deal.offered_per_employee)?`<div><div class="mk">Offered MRR</div><div class="mv fw-7">₱${Math.round(Number(deal.employees_covered)*Number(deal.offered_per_employee)).toLocaleString()}/mo</div></div>`:''}
-            ${deal.discount_percent?`<div><div class="mk">Discount</div><div class="mv">${deal.discount_percent}%</div></div>`:''}
-            ${deal.implementation_fee?`<div><div class="mk">Implementation Fee</div><div class="mv">${fmtFull(deal.implementation_fee)}</div></div>`:''}
+            ${(deal.pricing_per_user||deal.offered_per_employee)?`<div><div class="mk">Quoted Rate</div><div class="mv fw-7" style="color:var(--accent)">₱${Number(deal.pricing_per_user||deal.offered_per_employee).toFixed(2)}/user/mo</div></div>`:''}
+            ${(deal.employees_covered&&(deal.pricing_per_user||deal.offered_per_employee))?`<div><div class="mk">Monthly Revenue (MRR)</div><div class="mv fw-7" style="color:var(--accent)">₱${Math.round(Number(deal.employees_covered)*Number(deal.pricing_per_user||deal.offered_per_employee)).toLocaleString()}/mo</div></div>`:''}
+            ${deal.proposed_per_employee?`<div><div class="mk">List Rate</div><div class="mv" style="text-decoration:line-through;color:var(--t3)">₱${Number(deal.proposed_per_employee).toFixed(2)}/mo</div></div>`:''}
+            ${deal.discount_percent?`<div><div class="mk">Discount Applied</div><div class="mv">${deal.discount_percent}%</div></div>`:''}
             ${deal.contract_months?`<div><div class="mk">Contract Duration</div><div class="mv">${deal.contract_months} months</div></div>`:''}
+            ${deal.payment_terms?`<div><div class="mk">Payment Schedule</div><div class="mv">${{monthly:'Monthly',quarterly:'Quarterly',biyearly:'Semi-Annual',yearly:'Annual'}[deal.payment_terms]||deal.payment_terms}</div></div>`:''}
+            ${deal.implementation_fee?`<div><div class="mk">Implementation Fee</div><div class="mv">${fmtFull(deal.implementation_fee)}</div></div>`:''}
+            ${(deal.employees_covered&&(deal.pricing_per_user||deal.offered_per_employee)&&deal.contract_months)?`<div><div class="mk">Contract Value (ACV)</div><div class="mv fw-7">₱${Math.round(Number(deal.employees_covered)*Number(deal.pricing_per_user||deal.offered_per_employee)*Number(deal.contract_months)).toLocaleString()}</div></div>`:''}
           </div>
           ${deal.commercial_notes?`<div class="mk" style="margin-bottom:4px">Commercial Notes</div><div style="font-size:13px;color:var(--t2);white-space:pre-wrap;margin-bottom:16px">${esc(deal.commercial_notes)}</div>`:''}`:''}
 
@@ -623,7 +628,7 @@ async function openDealDetail(id) {
           <div class="section-hd"><span class="section-title">Actions</span></div>
           <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
             <button class="btn btn-g" style="width:100%;justify-content:center" onclick="openDealModal(${id})">✏ Edit Deal</button>
-            <button class="btn btn-d" style="width:100%;justify-content:center" onclick="deleteDeal(${id})">Delete Deal</button>
+            ${state.user?.role==='admin'?`<button class="btn btn-d" style="width:100%;justify-content:center" onclick="deleteDeal(${id})">Delete Deal</button>`:''}
           </div>
         </div>
         ${deal.company_name?`<div class="section"><div class="section-hd"><span class="section-title">Company</span></div><div style="padding:12px"><div class="fw-7">${esc(deal.company_name)}</div></div></div>`:''}
@@ -653,8 +658,8 @@ async function openDealModal(id = null) {
       <div class="fg"><label class="flbl">Company</label><select class="fsel" id="f-co"><option value="">— None —</option>${coOpts}</select></div>
       <div class="fg"><label class="flbl">Contact</label><select class="fsel" id="f-ct"><option value="">— None —</option>${ctOpts}</select></div>
       <div class="fg"><label class="flbl">Stage</label><select class="fsel" id="f-stage">${stageOpts}</select></div>
-      <div class="fg"><label class="flbl">Product Type</label><select class="fsel" id="f-product-type"><option value="bundled" ${(deal.product_type||'bundled')==='bundled'?'selected':''}>Bundled (HRIS + Financial Services)</option><option value="hris_only" ${deal.product_type==='hris_only'?'selected':''}>HRIS Only</option></select></div>
-      <div class="fg"><label class="flbl">Proposed Value (₱)</label><input class="finp" id="f-val" type="number" value="${deal.value||''}" placeholder="0"></div>
+      <div class="fg"><label class="flbl">Product Type</label><select class="fsel" id="f-product-type" onchange="dealCalcMRR()"><option value="bundled" ${(deal.product_type||'bundled')==='bundled'?'selected':''}>Bundled (HRIS + Financial Services)</option><option value="hris_only" ${deal.product_type==='hris_only'?'selected':''}>HRIS Only</option></select></div>
+      <div class="fg"><label class="flbl">Pipeline Value (₱) <span style="font-weight:400;color:var(--t3)">— auto from MRR × months</span></label><div class="finp-ro" id="f-val-display">${deal.value?'₱'+Number(deal.value).toLocaleString():'—'}</div><input type="hidden" id="f-val" value="${deal.value||0}"></div>
       <div class="fg"><label class="flbl">Owner</label><select class="fsel" id="f-owner">${uOpts}</select></div>
       <div class="fg"><label class="flbl">Expected Close Date</label><input class="finp" id="f-date" type="date" value="${deal.expected_close_date?.slice(0,10)||''}"></div>
       <div class="fg"><label class="flbl">Source</label><select class="fsel" id="f-src"><option value="">— None —</option>${srcOpts}</select></div>
@@ -668,24 +673,61 @@ async function openDealModal(id = null) {
       <div class="fg"><label class="flbl">Source Details</label><input class="finp" id="f-src-det" value="${esc(deal.source_details||'')}" placeholder="Event name, referrer, campaign…"></div>
     </div>
 
-    <div class="form-section-hd">Commercials</div>
+    <div class="form-section-hd">Pricing &amp; Commercials</div>
     <div class="fgrid">
-      <div class="fg"><label class="flbl">Employees Covered</label><input class="finp" id="f-emp" type="number" min="0" value="${deal.employees_covered||''}" placeholder="No. of employees"></div>
-      <div class="fg"><label class="flbl">Proposed / Employee / Month (₱)</label><input class="finp" id="f-prop-pepm" type="number" min="0" step="0.01" value="${deal.proposed_per_employee||''}" placeholder="0.00"></div>
-      <div class="fg"><label class="flbl">Offered Value (₱)</label><input class="finp" id="f-off-val" type="number" min="0" value="${deal.offered_value||''}" placeholder="Final offer"></div>
-      <div class="fg"><label class="flbl">Offered / Employee / Month (₱)</label><input class="finp" id="f-off-pepm" type="number" min="0" step="0.01" value="${deal.offered_per_employee||''}" placeholder="0.00"></div>
-      <div class="fg"><label class="flbl">Discount (%)</label><input class="finp" id="f-disc" type="number" min="0" max="100" step="0.01" value="${deal.discount_percent||''}" placeholder="0"></div>
-      <div class="fg"><label class="flbl">Implementation Fee (₱)</label><input class="finp" id="f-impl" type="number" min="0" value="${deal.implementation_fee||''}" placeholder="One-time fee"></div>
-      <div class="fg"><label class="flbl">Contract Duration (months)</label><input class="finp" id="f-months" type="number" min="1" value="${deal.contract_months||''}" placeholder="e.g. 12, 24"></div>
+      <div class="fg"><label class="flbl">Employees Covered (Headcount)</label><input class="finp" id="f-emp" type="number" min="0" value="${deal.employees_covered||''}" placeholder="No. of employees" oninput="dealCalcMRR()"></div>
+      <div class="fg"><label class="flbl">Quoted Rate (₱/user/month) <span style="font-weight:400;color:var(--t3)">— final agreed price</span></label><input class="finp" id="f-pricing-pu" type="number" min="0" step="0.01" value="${deal.pricing_per_user||deal.offered_per_employee||''}" placeholder="e.g. 239.00" oninput="dealCalcMRR()"></div>
+      <div class="fg"><label class="flbl">Monthly Revenue (MRR) <span style="font-weight:400;color:var(--t3)">— auto</span></label><div class="finp-ro" id="f-mrr-preview">—</div></div>
+      <div class="fg"><label class="flbl">Discount Applied (%)</label><input class="finp" id="f-disc" type="number" min="0" max="100" step="0.01" value="${deal.discount_percent||''}" placeholder="e.g. 25"></div>
+      <div class="fg"><label class="flbl">Product Plan / Label</label><input class="finp" id="f-product-plan" value="${esc(deal.product_plan||'')}" placeholder="e.g. BeneFi HRIS Growth · Vol25+Early10"></div>
+      <div class="fg"><label class="flbl">List Rate (₱/user/mo) <span style="font-weight:400;color:var(--t3)">— before discount</span></label><input class="finp" id="f-prop-pepm" type="number" min="0" step="0.01" value="${deal.proposed_per_employee||''}" placeholder="299.00"></div>
+    </div>
+
+    <div class="form-section-hd">Contract Terms</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">Contract Duration</label>
+        <select class="fsel" id="f-months" onchange="dealCalcMRR()">
+          <option value="">— Choose —</option>
+          ${[12,24,36].map(m=>`<option value="${m}" ${deal.contract_months==m?'selected':''}>${m} months</option>`).join('')}
+          ${deal.contract_months&&![12,24,36].includes(Number(deal.contract_months))?`<option value="${deal.contract_months}" selected>${deal.contract_months} months (custom)</option>`:''}
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="fg" id="f-months-custom-wrap" style="display:${(deal.contract_months&&![12,24,36].includes(Number(deal.contract_months)))?'block':'none'}">
+        <label class="flbl">Custom Months</label><input class="finp" id="f-months-custom" type="number" min="1" value="${(deal.contract_months&&![12,24,36].includes(Number(deal.contract_months)))?deal.contract_months:''}" oninput="dealCalcMRR()">
+      </div>
+      <div class="fg"><label class="flbl">Payment Schedule</label>
+        <select class="fsel" id="f-payment-terms">
+          <option value="">— None —</option>
+          <option value="monthly"   ${deal.payment_terms==='monthly'  ?'selected':''}>Monthly</option>
+          <option value="quarterly" ${deal.payment_terms==='quarterly'?'selected':''}>Quarterly</option>
+          <option value="biyearly"  ${deal.payment_terms==='biyearly' ?'selected':''}>Semi-Annual (Bi-Yearly)</option>
+          <option value="yearly"    ${deal.payment_terms==='yearly'   ?'selected':''}>Annual (Yearly)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Implementation Fee (₱) <span style="font-weight:400;color:var(--t3)">— one-time</span></label><input class="finp" id="f-impl" type="number" min="0" value="${deal.implementation_fee||''}" placeholder="0"></div>
+      <div class="fg"><label class="flbl">Contract Value (ACV) <span style="font-weight:400;color:var(--t3)">— auto</span></label><div class="finp-ro" id="f-acv-preview">—</div></div>
       <div class="fg"><label class="flbl">Target Go-Live Date</label><input class="finp" id="f-golive" type="date" value="${deal.go_live_date?.slice(0,10)||''}"></div>
-      <div class="fg span2"><label class="flbl">Commercial Notes</label><textarea class="ftxt" id="f-comnotes" placeholder="Pricing rationale, negotiation notes, approval conditions…">${esc(deal.commercial_notes||'')}</textarea></div>
+      <div class="fg span2"><label class="flbl">Commercial Notes</label><textarea class="ftxt" id="f-comnotes" placeholder="Pricing rationale, approval conditions, special terms…">${esc(deal.commercial_notes||'')}</textarea></div>
+    </div>
+
+    <div class="form-section-hd" style="color:#8B5CF6">Trial Period</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">Trial Start Date</label><input class="finp" id="f-trial-start" type="date" value="${deal.trial_start_date?.slice(0,10)||''}"></div>
+      <div class="fg"><label class="flbl">Trial End Date</label><input class="finp" id="f-trial-end" type="date" value="${deal.trial_end_date?.slice(0,10)||''}"></div>
+    </div>
+
+    <div class="form-section-hd" style="color:#EF4444">Loss Tracking</div>
+    <div class="fgrid">
+      <div class="fg span2"><label class="flbl">Lost Reason</label><select class="fsel" id="f-lost-reason"><option value="">— Not applicable —</option>${['Price too high','Competitor selected','No budget','Product fit','Timing','No decision','Other'].map(r=>`<option value="${r}" ${deal.lost_reason===r?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>`,
-    `${id?`<button class="btn btn-d" onclick="deleteDeal(${id})">Delete</button>`:'<div></div>'}
+    `${(id && state.user?.role==='admin')?`<button class="btn btn-d" onclick="deleteDeal(${id})">Delete</button>`:'<div></div>'}
      <div class="modal-ft-right">
        <button class="btn btn-g" onclick="closeModal()">Cancel</button>
        <button class="btn btn-p" onclick="saveDeal(${id||'null'})">Save Deal</button>
      </div>`
   );
+  setTimeout(() => window.dealCalcMRR?.(), 50);
 }
 
 async function saveDeal(id) {
@@ -704,16 +746,21 @@ async function saveDeal(id) {
     description:         document.getElementById('f-desc').value.trim() || null,
     partner_id:          document.getElementById('f-partner').value || null,
     source_details:      document.getElementById('f-src-det').value.trim() || null,
-    employees_covered:   parseInt(document.getElementById('f-emp').value)||null,
+    employees_covered:     parseInt(document.getElementById('f-emp').value)||null,
+    pricing_per_user:      parseFloat(document.getElementById('f-pricing-pu').value)||null,
     proposed_per_employee: parseFloat(document.getElementById('f-prop-pepm').value)||null,
-    offered_value:       parseFloat(document.getElementById('f-off-val').value)||null,
-    offered_per_employee: parseFloat(document.getElementById('f-off-pepm').value)||null,
-    discount_percent:    parseFloat(document.getElementById('f-disc').value)||null,
-    implementation_fee:  parseFloat(document.getElementById('f-impl').value)||null,
-    contract_months:     parseInt(document.getElementById('f-months').value)||null,
-    go_live_date:        document.getElementById('f-golive').value || null,
-    commercial_notes:    document.getElementById('f-comnotes').value.trim() || null,
-    product_type:        document.getElementById('f-product-type').value || 'bundled',
+    discount_percent:      parseFloat(document.getElementById('f-disc').value)||null,
+    product_plan:          document.getElementById('f-product-plan').value.trim()||null,
+    implementation_fee:    parseFloat(document.getElementById('f-impl').value)||null,
+    contract_months:       (() => { const sel=document.getElementById('f-months').value; return sel==='custom'?parseInt(document.getElementById('f-months-custom')?.value)||null:parseInt(sel)||null; })(),
+    payment_terms:         document.getElementById('f-payment-terms').value || null,
+    go_live_date:          document.getElementById('f-golive').value || null,
+    commercial_notes:      document.getElementById('f-comnotes').value.trim() || null,
+    product_type:          document.getElementById('f-product-type').value || 'bundled',
+    trial_start_date:      document.getElementById('f-trial-start').value || null,
+    trial_end_date:        document.getElementById('f-trial-end').value || null,
+    lost_reason:           document.getElementById('f-lost-reason').value || null,
+    value:                 parseFloat(document.getElementById('f-val').value)||0,
   };
   try {
     if (id) { await api.put(`/api/deals/${id}`, body); toast('Deal updated'); }
@@ -727,6 +774,31 @@ async function deleteDeal(id) {
   try { await api.delete(`/api/deals/${id}`); toast('Deal deleted'); closeModal(); navigate('pipeline'); }
   catch(err) { toast(err.message,'err'); }
 }
+
+window.dealCalcMRR = function() {
+  const hc      = parseInt(document.getElementById('f-emp')?.value) || 0;
+  const rate    = parseFloat(document.getElementById('f-pricing-pu')?.value) || 0;
+  const mSel    = document.getElementById('f-months')?.value;
+  const mCustom = parseInt(document.getElementById('f-months-custom')?.value) || 0;
+  const months  = mSel === 'custom' ? mCustom : (parseInt(mSel) || 0);
+
+  // show/hide custom months input
+  const wrap = document.getElementById('f-months-custom-wrap');
+  if (wrap) wrap.style.display = mSel === 'custom' ? 'block' : 'none';
+
+  const mrr = hc && rate ? hc * rate : 0;
+  const acv = mrr && months ? mrr * months : 0;
+
+  const mrrEl = document.getElementById('f-mrr-preview');
+  const acvEl = document.getElementById('f-acv-preview');
+  const valEl = document.getElementById('f-val');
+  const valDisp = document.getElementById('f-val-display');
+
+  if (mrrEl) mrrEl.textContent = mrr ? '₱' + Math.round(mrr).toLocaleString() + '/mo' : '—';
+  if (acvEl) acvEl.textContent = acv ? '₱' + Math.round(acv).toLocaleString() : '—';
+  if (valEl) valEl.value = acv || (parseFloat(valEl.value) || 0);
+  if (valDisp) valDisp.textContent = acv ? '₱' + Math.round(acv).toLocaleString() : (valEl?.value ? '₱' + Number(valEl.value).toLocaleString() : '—');
+};
 
 // ── Deals list ────────────────────────────────────────────────────────────────
 VIEWS.deals = async () => {
@@ -883,7 +955,7 @@ async function openContactModal(id=null) {
       <div class="fg span2"><label class="flbl">LinkedIn URL</label><input class="finp" id="f-li" value="${esc(c.linkedin_url||'')}"></div>
       <div class="fg span2"><label class="flbl">Notes</label><textarea class="ftxt" id="f-nt">${esc(c.notes||'')}</textarea></div>
     </div>`,
-    `${id?`<button class="btn btn-d" onclick="deleteContact(${id})">Delete</button>`:'<div></div>'}
+    `${(id&&state.user?.role==='admin')?`<button class="btn btn-d" onclick="deleteContact(${id})">Delete</button>`:'<div></div>'}
      <div class="modal-ft-right"><button class="btn btn-g" onclick="closeModal()">Cancel</button><button class="btn btn-p" onclick="saveContact(${id||'null'})">Save</button></div>`
   );
 }
@@ -987,7 +1059,7 @@ async function openCompanyModal(id=null) {
       <div class="fg"><label class="flbl">Solution Name</label><input class="finp" id="f-fin-name" value="${esc(c.fin_services_name||'')}" placeholder="e.g. GCash for Business, PayWatch"></div>
       <div class="fg span2"><label class="flbl">Details (provider, cost, coverage)</label><textarea class="ftxt" id="f-fin-det" style="min-height:54px">${esc(c.fin_services_details||'')}</textarea></div>
     </div>`,
-    `${id?`<button class="btn btn-d" onclick="deleteCompany(${id})">Delete</button>`:'<div></div>'}
+    `${(id&&state.user?.role==='admin')?`<button class="btn btn-d" onclick="deleteCompany(${id})">Delete</button>`:'<div></div>'}
      <div class="modal-ft-right"><button class="btn btn-g" onclick="closeModal()">Cancel</button><button class="btn btn-p" onclick="saveCompany(${id||'null'})">Save</button></div>`
   );
 }
@@ -2184,5 +2256,383 @@ VIEWS.targets = async () => {
 
 window.tgtSetYear = function(y) { _tgtYear = parseInt(y); navigate('targets'); };
 window.tgtSetYear = window.tgtSetYear;
+
+// ── Pricing Dashboard ─────────────────────────────────────────────────────────
+VIEWS.pricing = async () => {
+  const [cfg, forecast, wonData] = await Promise.all([
+    api.get('/api/pricing/config'),
+    api.get('/api/pricing/forecast'),
+    api.get('/api/pricing/clients-won').catch(()=>({won_count:0})),
+  ]);
+  if (!cfg || !forecast) return;
+
+  const v = document.getElementById('view');
+  const isAdmin = state.user?.role === 'admin';
+
+  const c = k => Number(cfg[k]?.value ?? 0);
+  const listPrice      = c('list_price');
+  const finToolFee     = c('fin_tool_fee');
+  const maxDiscBundled = c('max_discount_pct');
+  const maxDiscHris    = c('max_discount_hris_pct');
+  const waiverClients  = c('fin_tool_waiver_clients');
+  const wonCount       = Number(wonData.won_count || 0);
+  const finToolWaived  = wonCount < waiverClients;
+  const customQuals    = Object.entries(cfg)
+    .filter(([k]) => k.startsWith('custom_qual_'))
+    .map(([k, v]) => ({ key: k, label: v.label || k, pct: Number(v.value) }));
+  const payDisc = {
+    quarterly: c('payment_quarterly_discount'),
+    biyearly:  c('payment_biyearly_discount'),
+    yearly:    c('payment_yearly_discount'),
+  };
+
+  window._pricingFinToolWaived = finToolWaived;
+  window._pricingFinToolFee    = finToolFee;
+  window._pricingListPrice     = listPrice;
+  window._pricingMaxBundled    = maxDiscBundled;
+  window._pricingMaxHris       = maxDiscHris;
+  window._pricingPayDisc       = payDisc;
+
+  v.innerHTML = `
+    <div class="pricing-layout">
+      <div class="pricing-main">
+        <div class="section">
+          <div class="section-hd"><span class="section-title">Deal Pricing Calculator</span></div>
+          <div style="padding:20px">
+            <div class="fgrid" style="margin-bottom:16px">
+              <div class="fg">
+                <label class="flbl">Headcount (No. of Employees)</label>
+                <input class="finp" id="pc-hc" type="number" min="1" value="100" oninput="pricingCalc()">
+              </div>
+              <div class="fg">
+                <label class="flbl">Client Signup Rank <span style="font-weight:400;color:var(--t3)">(1 = first to sign)</span></label>
+                <input class="finp" id="pc-rank" type="number" min="1" value="50" oninput="pricingCalc()">
+              </div>
+              <div class="fg">
+                <label class="flbl">Product Type</label>
+                <select class="fsel" id="pc-product" onchange="pricingCalc()">
+                  <option value="bundled">Bundled (HRIS + Financial Services) — ${maxDiscBundled}% cap</option>
+                  <option value="hris_only">HRIS Only — ${maxDiscHris}% cap</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="flbl">Payment Schedule <span style="font-weight:400;color:var(--t3)">(advance payment)</span></label>
+                <select class="fsel" id="pc-payment" onchange="pricingCalc()">
+                  <option value="">Monthly (no advance discount)</option>
+                  <option value="quarterly">Quarterly (+${payDisc.quarterly}%)</option>
+                  <option value="biyearly">Semi-Annual / Bi-Yearly (+${payDisc.biyearly}%)</option>
+                  <option value="yearly">Annual / Yearly (+${payDisc.yearly}%)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-bottom:14px">
+              <div class="flbl" style="margin-bottom:8px">Standard Qualifiers <span style="font-weight:400;color:var(--t3)">(${c('qualifier_discount_each')}% each)</span></div>
+              <div class="pricing-checks">
+                <label class="pcheck"><input type="checkbox" id="pc-q1" onchange="pricingCalc()"> Full Enrollment (≥80% of employees)</label>
+                <label class="pcheck"><input type="checkbox" id="pc-q2" onchange="pricingCalc()"> Standard Implementation Only</label>
+                <label class="pcheck"><input type="checkbox" id="pc-q3" onchange="pricingCalc()"> 36-Month Term Commitment</label>
+              </div>
+            </div>
+
+            ${customQuals.length ? `
+            <div style="margin-bottom:14px">
+              <div class="flbl" style="margin-bottom:8px">Custom Qualifiers</div>
+              <div class="pricing-checks">
+                ${customQuals.map(q=>`
+                  <label class="pcheck">
+                    <input type="checkbox" class="pc-custom" data-pct="${q.pct}" data-key="${q.key}" onchange="pricingCalc()">
+                    ${esc(q.label)} (+${q.pct}%)
+                    ${isAdmin?`<button class="btn-icon-del" title="Remove" onclick="deleteCustomQual('${q.key}')">✕</button>`:''}
+                  </label>`).join('')}
+              </div>
+            </div>` : ''}
+
+            <div style="margin-bottom:20px">
+              <label class="pcheck">
+                <input type="checkbox" id="pc-fast" onchange="pricingCalc()">
+                Fast-Decision Bonus (+${c('fast_decision_discount')}%) — signed within ${c('fast_decision_days')} days of proposal
+              </label>
+            </div>
+
+            <div class="pricing-result" id="pricing-result"></div>
+
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bd)">
+              <div class="flbl" style="margin-bottom:8px">Apply Calculator Result to a Deal</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select class="fsel" id="pc-deal-target" style="flex:1;min-width:160px">
+                  <option value="">— Select open deal —</option>
+                  ${forecast.deals.map(d=>`<option value="${d.id}">${esc(d.company_name||d.title)} · ${esc(d.stage_name||'')}</option>`).join('')}
+                </select>
+                <button class="btn btn-p" onclick="applyPricingToDeal()">Apply to Deal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-top:20px">
+          <div class="section-hd">
+            <span class="section-title">Pipeline Revenue Forecast</span>
+            <span style="font-size:11.5px;color:var(--t3)">${forecast.deals.length} open deals</span>
+          </div>
+          <div style="padding:16px 20px">
+            <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+              <div class="stat-card">
+                <div class="stat-lbl">Total Pipeline MRR</div>
+                <div class="stat-val">₱${Math.round(forecast.totalMrr).toLocaleString()}</div>
+                <div class="stat-sub">${forecast.totalHeadcount.toLocaleString()} employees</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-lbl">Probability-Weighted MRR</div>
+                <div class="stat-val" style="color:var(--accent)">₱${Math.round(forecast.weightedMrr).toLocaleString()}</div>
+                <div class="stat-sub">Expected monthly</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-lbl">Weighted ARR</div>
+                <div class="stat-val">₱${forecast.weightedMrr*12>=1e6?(forecast.weightedMrr*12/1e6).toFixed(1)+'M':Math.round(forecast.weightedMrr*12/1000)+'K'}</div>
+                <div class="stat-sub">12-month projection</div>
+              </div>
+            </div>
+            ${forecast.deals.length===0 ? '<div class="tbl-empty">No open deals in pipeline.</div>' : `
+            <div style="overflow-x:auto">
+              <table class="tbl">
+                <thead><tr><th>Company</th><th>Plan</th><th>Stage</th><th>HC</th><th>Rate</th><th>MRR</th><th>Prob</th><th>Wtd MRR</th></tr></thead>
+                <tbody>
+                  ${forecast.deals.map(d=>`
+                    <tr>
+                      <td class="fw-6">${esc(d.company_name||d.title)}</td>
+                      <td style="max-width:130px"><span style="font-size:11px;color:var(--t3)">${esc(d.product_plan||'—')}</span></td>
+                      <td><span class="badge" style="background:${d.stage_color||'#64748B'}22;color:${d.stage_color||'#64748B'}">${esc(d.stage_name||'—')}</span></td>
+                      <td>${d.employees_covered?Number(d.employees_covered).toLocaleString():'—'}</td>
+                      <td>${d.mrr>0?'₱'+Number(d.pricing_per_user||d.offered_per_employee||d.proposed_per_employee||0).toFixed(2):'—'}</td>
+                      <td class="fw-7">${d.mrr>0?'₱'+Math.round(d.mrr).toLocaleString():'—'}</td>
+                      <td>${d.probability}%</td>
+                      <td style="color:var(--accent)">${d.weighted_mrr>0?'₱'+Math.round(d.weighted_mrr).toLocaleString():'—'}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>`}
+          </div>
+        </div>
+      </div>
+
+      <div class="pricing-side">
+        <div class="section">
+          <div class="section-hd"><span class="section-title">Pricing Reference</span></div>
+          <div style="padding:12px 16px">
+            <div class="pricing-assumption"><span class="pa-lbl">List Price</span><span class="pa-val">₱${listPrice}/user/mo</span></div>
+            <div class="pricing-assumption"><span class="pa-lbl">Fin. Tool Fee</span><span class="pa-val">₱${finToolFee}/user/mo</span></div>
+            <div class="pricing-assumption" style="color:${finToolWaived?'#22C55E':'#EF4444'}">
+              <span class="pa-lbl">Fin. Tool Waiver</span>
+              <span class="pa-val" style="font-size:11.5px">${finToolWaived?`Active (${wonCount}/${waiverClients})`:`Expired (${wonCount})`}</span>
+            </div>
+            <div class="pricing-assumption"><span class="pa-lbl">Cap — Bundled</span><span class="pa-val">${maxDiscBundled}%</span></div>
+            <div class="pricing-assumption"><span class="pa-lbl">Cap — HRIS Only</span><span class="pa-val">${maxDiscHris}%</span></div>
+            <div class="pa-section-hd">Volume Discounts</div>
+            ${['vol_slab_100','vol_slab_250','vol_slab_500','vol_slab_1000'].map((k,i)=>`<div class="pricing-assumption"><span class="pa-lbl">${['100+','250+','500+','1000+'][i]} HC</span><span class="pa-val">${c(k)}%</span></div>`).join('')}
+            <div class="pa-section-hd">Early Access</div>
+            <div class="pricing-assumption"><span class="pa-lbl">Rank 1–25</span><span class="pa-val">${c('early_rank_1_25')}%</span></div>
+            <div class="pricing-assumption"><span class="pa-lbl">Rank 26–100</span><span class="pa-val">${c('early_rank_26_100')}%</span></div>
+            <div class="pa-section-hd">Advance Payment</div>
+            <div class="pricing-assumption"><span class="pa-lbl">Quarterly</span><span class="pa-val">${payDisc.quarterly}%</span></div>
+            <div class="pricing-assumption"><span class="pa-lbl">Semi-Annual</span><span class="pa-val">${payDisc.biyearly}%</span></div>
+            <div class="pricing-assumption"><span class="pa-lbl">Annual</span><span class="pa-val">${payDisc.yearly}%</span></div>
+          </div>
+        </div>
+
+        ${isAdmin ? `
+        <div class="section" style="margin-top:14px">
+          <div class="section-hd"><span class="section-title">Edit Assumptions</span></div>
+          <div style="padding:12px 16px">
+            ${Object.entries(cfg).filter(([k])=>!k.startsWith('custom_qual_')).map(([k,v])=>`
+              <div style="margin-bottom:8px">
+                <label class="flbl" style="font-size:10.5px">${esc(v.label||k)}</label>
+                <input class="finp" style="font-size:12px;padding:5px 8px" data-cfg-key="${k}" value="${esc(v.value)}" type="number" min="0" step="0.01" oninput="pricingCalc()">
+              </div>`).join('')}
+            <button class="btn btn-p" style="width:100%;justify-content:center;margin-top:6px" onclick="savePricingConfig()">Save Assumptions</button>
+          </div>
+        </div>
+        <div class="section" style="margin-top:14px">
+          <div class="section-hd"><span class="section-title">Custom Qualifiers</span></div>
+          <div style="padding:12px 16px">
+            ${customQuals.length===0?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">No custom qualifiers yet.</div>':''}
+            ${customQuals.map(q=>`<div class="pricing-assumption"><span class="pa-lbl">${esc(q.label)}</span><span style="display:flex;gap:6px;align-items:center"><span class="pa-val">${q.pct}%</span><button class="btn-icon-del" onclick="deleteCustomQual('${q.key}')">✕</button></span></div>`).join('')}
+            <div style="display:flex;gap:6px;margin-top:10px">
+              <input class="finp" id="new-qual-label" placeholder="Qualifier name" style="flex:2;font-size:12px;padding:5px 8px">
+              <input class="finp" id="new-qual-pct" type="number" min="0" max="50" placeholder="%" style="flex:1;font-size:12px;padding:5px 8px">
+              <button class="btn btn-g" onclick="addCustomQual()">+</button>
+            </div>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
+
+  pricingCalc();
+};
+
+function planLabel(disc, components, productType) {
+  const tier   = productType === 'hris_only' ? 'HRIS' : 'Bundle';
+  const detail = components.length ? ` (${components.join(' + ')})` : '';
+  if (disc === 0) return `BeneFi ${tier} Standard`;
+  if (disc <= 15) return `BeneFi ${tier} Essential${detail}`;
+  if (disc <= 30) return `BeneFi ${tier} Growth${detail}`;
+  if (disc <= 50) return `BeneFi ${tier} Pro${detail}`;
+  return `BeneFi ${tier} Enterprise${detail}`;
+}
+
+window.pricingCalc = function() {
+  const hc      = parseInt(document.getElementById('pc-hc')?.value)   || 0;
+  const rank    = parseInt(document.getElementById('pc-rank')?.value)  || 999;
+  const product = document.getElementById('pc-product')?.value || 'bundled';
+  const payment = document.getElementById('pc-payment')?.value || '';
+  const q1      = document.getElementById('pc-q1')?.checked;
+  const q2      = document.getElementById('pc-q2')?.checked;
+  const q3      = document.getElementById('pc-q3')?.checked;
+  const fast    = document.getElementById('pc-fast')?.checked;
+  const el      = document.getElementById('pricing-result');
+  if (!el) return;
+  if (!hc) { el.innerHTML = '<div style="color:var(--t3);text-align:center;padding:16px">Enter headcount to see pricing.</div>'; return; }
+
+  const cfgDom = {};
+  document.querySelectorAll('[data-cfg-key]').forEach(inp => { cfgDom[inp.dataset.cfgKey] = Number(inp.value); });
+  const cv = (k, def) => (cfgDom[k] !== undefined ? cfgDom[k] : def);
+
+  const listP  = cv('list_price', window._pricingListPrice ?? 299);
+  const maxCap = product === 'hris_only'
+    ? cv('max_discount_hris_pct', window._pricingMaxHris    ?? 50)
+    : cv('max_discount_pct',      window._pricingMaxBundled ?? 80);
+  const finFeeAmt = (product !== 'hris_only' && !window._pricingFinToolWaived)
+    ? cv('fin_tool_fee', window._pricingFinToolFee ?? 99)
+    : 0;
+
+  const comps = [];
+  let disc = 0;
+
+  let volD = 0;
+  if      (hc >= 1000) volD = cv('vol_slab_1000', 40);
+  else if (hc >= 500)  volD = cv('vol_slab_500',  35);
+  else if (hc >= 250)  volD = cv('vol_slab_250',  30);
+  else if (hc >= 100)  volD = cv('vol_slab_100',  25);
+  if (volD) { disc += volD; comps.push('Vol' + volD); }
+
+  let earlyD = 0;
+  if (rank <= 25)       earlyD = cv('early_rank_1_25',   20);
+  else if (rank <= 100) earlyD = cv('early_rank_26_100', 10);
+  if (earlyD) { disc += earlyD; comps.push('Early' + earlyD); }
+
+  const qDisc = cv('qualifier_discount_each', 5);
+  const stdQ  = [q1, q2, q3].filter(Boolean).length;
+  if (stdQ) { disc += stdQ * qDisc; comps.push('Q×' + stdQ); }
+
+  document.querySelectorAll('.pc-custom:checked').forEach(cb => {
+    const pct = Number(cb.dataset.pct) || 0;
+    disc += pct;
+    comps.push(cb.closest('label')?.textContent?.trim().split('(')[0].trim().slice(0, 12) || ('+' + pct + '%'));
+  });
+
+  const pd = window._pricingPayDisc || { quarterly: 3, biyearly: 5, yearly: 8 };
+  const payD = {
+    quarterly: cv('payment_quarterly_discount', pd.quarterly),
+    biyearly:  cv('payment_biyearly_discount',  pd.biyearly),
+    yearly:    cv('payment_yearly_discount',     pd.yearly),
+  };
+  if (payment && payD[payment]) { disc += payD[payment]; comps.push('Pay+' + payD[payment]); }
+
+  if (fast) { const fd = cv('fast_decision_discount', 10); disc += fd; comps.push('Fast' + fd); }
+
+  disc = Math.min(disc, maxCap);
+
+  const effective   = listP * (1 - disc / 100);
+  const bundledRate = effective + finFeeAmt;
+  const displayRate = product === 'hris_only' ? effective : bundledRate;
+  const mrr         = displayRate * hc;
+  const arr         = mrr * 12;
+  const plan        = planLabel(disc, comps, product);
+
+  window._pricingLastResult = { disc, effective, bundledRate, displayRate, mrr, arr, hc, plan, product, payment };
+
+  const discCls = disc >= maxCap ? 'pr-red' : disc >= 30 ? 'pr-amber' : '';
+  el.innerHTML = `
+    <div class="pr-plan-badge">${esc(plan)}</div>
+    <div class="pr-grid">
+      <div class="pr-item">
+        <div class="pr-lbl">Discount</div>
+        <div class="pr-val ${discCls}">${disc.toFixed(0)}%</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">cap ${maxCap}%</div>
+      </div>
+      <div class="pr-item">
+        <div class="pr-lbl">HRIS Rate</div>
+        <div class="pr-val pr-accent">₱${effective.toFixed(2)}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">/user/mo</div>
+      </div>
+      ${product !== 'hris_only' ? `<div class="pr-item">
+        <div class="pr-lbl">Bundled Rate</div>
+        <div class="pr-val pr-accent">₱${bundledRate.toFixed(2)}</div>
+        <div style="font-size:10px;color:${window._pricingFinToolWaived?'#22C55E':'var(--t3)'};margin-top:2px">incl. fin. tool${window._pricingFinToolWaived?' (waived)':''}</div>
+      </div>` : ''}
+      <div class="pr-item">
+        <div class="pr-lbl">MRR</div>
+        <div class="pr-val">₱${Math.round(mrr).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">/month</div>
+      </div>
+      <div class="pr-item">
+        <div class="pr-lbl">ARR</div>
+        <div class="pr-val">₱${arr >= 1e6 ? (arr/1e6).toFixed(1)+'M' : Math.round(arr/1000)+'K'}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">12 months</div>
+      </div>
+    </div>
+    <div class="pr-breakdown">
+      ₱${listP} list → <b>${disc.toFixed(0)}% off</b> → HRIS ₱${effective.toFixed(2)}
+      ${product !== 'hris_only' ? `+ Fin. Tool ${window._pricingFinToolWaived ? '<span style="color:#22C55E">₱0 (waived)</span>' : '₱' + finFeeAmt} = <b>₱${bundledRate.toFixed(2)}/user/mo</b>` : ''}
+    </div>`;
+};
+
+window.applyPricingToDeal = async function() {
+  const dealId = document.getElementById('pc-deal-target')?.value;
+  if (!dealId) { toast('Select a deal first', 'err'); return; }
+  const r = window._pricingLastResult;
+  if (!r) { toast('Run the calculator first', 'err'); return; }
+  try {
+    await api.put(`/api/deals/${dealId}`, {
+      pricing_per_user: parseFloat(r.displayRate.toFixed(2)),
+      discount_percent: parseFloat(r.disc.toFixed(2)),
+      product_type:     r.product,
+      payment_terms:    r.payment || null,
+      product_plan:     r.plan,
+    });
+    toast('Deal pricing updated — open the deal to complete other fields');
+  } catch(err) { toast(err.message, 'err'); }
+};
+
+window.savePricingConfig = async function() {
+  const updates = {};
+  document.querySelectorAll('[data-cfg-key]').forEach(inp => { updates[inp.dataset.cfgKey] = inp.value; });
+  try {
+    await api.put('/api/pricing/config', updates);
+    toast('Pricing assumptions saved');
+    navigate('pricing');
+  } catch(err) { toast(err.message, 'err'); }
+};
+
+window.addCustomQual = async function() {
+  const label = document.getElementById('new-qual-label')?.value.trim();
+  const pct   = document.getElementById('new-qual-pct')?.value;
+  if (!label || !pct) { toast('Enter a name and percentage', 'err'); return; }
+  try {
+    await api.post('/api/pricing/qualifiers', { label, value: pct });
+    toast('Custom qualifier added');
+    navigate('pricing');
+  } catch(err) { toast(err.message, 'err'); }
+};
+
+window.deleteCustomQual = async function(key) {
+  if (!confirm('Remove this custom qualifier?')) return;
+  try {
+    await api.delete(`/api/pricing/qualifiers/${key}`);
+    toast('Qualifier removed');
+    navigate('pricing');
+  } catch(err) { toast(err.message, 'err'); }
+};
+
 
 init();

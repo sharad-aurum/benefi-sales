@@ -7,8 +7,9 @@ router.use(requireAuth);
 
 const BASE_SELECT = `
   SELECT d.id, d.title, d.value, d.offered_value, d.discount_percent,
-         d.proposed_per_employee, d.offered_per_employee, d.employees_covered,
-         d.implementation_fee, d.contract_months, d.go_live_date, d.commercial_notes,
+         d.proposed_per_employee, d.offered_per_employee, d.pricing_per_user, d.employees_covered,
+         d.implementation_fee, d.contract_months, d.payment_terms, d.go_live_date, d.commercial_notes,
+         d.trial_start_date, d.trial_end_date, d.lost_reason, d.product_plan,
          d.product_type,
          d.probability, d.expected_close_date, d.actual_close_date,
          d.source, d.source_details, d.description, d.stage_changed_at, d.created_at, d.updated_at,
@@ -64,9 +65,9 @@ router.post('/', async (req, res) => {
   const {
     title, company_id, contact_id, stage_id, value, probability,
     expected_close_date, source, source_details, description,
-    partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee,
-    employees_covered, implementation_fee, contract_months, go_live_date, commercial_notes,
-    product_type,
+    partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee, pricing_per_user,
+    employees_covered, implementation_fee, contract_months, payment_terms, go_live_date, commercial_notes,
+    product_type, trial_start_date, trial_end_date, lost_reason, product_plan,
   } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required.' });
   const owner_id = req.body.owner_id || req.user.id;
@@ -78,17 +79,17 @@ router.post('/', async (req, res) => {
       `INSERT INTO deals
          (title, company_id, contact_id, owner_id, stage_id, value, probability,
           expected_close_date, source, source_details, description, created_by,
-          partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee,
-          employees_covered, implementation_fee, contract_months, go_live_date, commercial_notes,
-          product_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee, pricing_per_user,
+          employees_covered, implementation_fee, contract_months, payment_terms, go_live_date, commercial_notes,
+          product_type, trial_start_date, trial_end_date, lost_reason, product_plan)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [title, company_id || null, contact_id || null, owner_id, stage_id || null, value || 0, prob,
        expected_close_date || null, source || null, source_details || null, description || null, req.user.id,
        partner_id || null, offered_value || null, discount_percent || null,
-       proposed_per_employee || null, offered_per_employee || null,
+       proposed_per_employee || null, offered_per_employee || null, pricing_per_user || null,
        employees_covered || null, implementation_fee || null,
-       contract_months || null, go_live_date || null, commercial_notes || null,
-       product_type || 'bundled']
+       contract_months || null, payment_terms || null, go_live_date || null, commercial_notes || null,
+       product_type || 'bundled', trial_start_date || null, trial_end_date || null, lost_reason || null, product_plan || null]
     );
     res.status(201).json({ id: r.insertId });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error.' }); }
@@ -98,9 +99,9 @@ router.put('/:id', async (req, res) => {
   const {
     title, company_id, contact_id, owner_id, stage_id, value, probability,
     expected_close_date, actual_close_date, source, source_details, description,
-    partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee,
-    employees_covered, implementation_fee, contract_months, go_live_date, commercial_notes,
-    product_type,
+    partner_id, offered_value, discount_percent, proposed_per_employee, offered_per_employee, pricing_per_user,
+    employees_covered, implementation_fee, contract_months, payment_terms, go_live_date, commercial_notes,
+    product_type, trial_start_date, trial_end_date, lost_reason, product_plan,
   } = req.body;
   try {
     const [[deal]] = await pool.execute(
@@ -126,10 +127,11 @@ router.put('/:id', async (req, res) => {
          description = COALESCE(?, description),
          partner_id = ?,
          offered_value = ?, discount_percent = ?,
-         proposed_per_employee = ?, offered_per_employee = ?,
+         proposed_per_employee = ?, offered_per_employee = ?, pricing_per_user = ?,
          employees_covered = ?, implementation_fee = ?,
-         contract_months = ?, go_live_date = ?,
+         contract_months = ?, payment_terms = ?, go_live_date = ?,
          commercial_notes = ?,
+         trial_start_date = ?, trial_end_date = ?, lost_reason = ?, product_plan = ?,
          product_type = COALESCE(?, product_type),
          stage_changed_at = IF(? != stage_id, NOW(), stage_changed_at)
        WHERE id = ?`,
@@ -143,10 +145,11 @@ router.put('/:id', async (req, res) => {
        description || null,
        partner_id ?? null,
        offered_value ?? null, discount_percent ?? null,
-       proposed_per_employee ?? null, offered_per_employee ?? null,
+       proposed_per_employee ?? null, offered_per_employee ?? null, pricing_per_user ?? null,
        employees_covered ?? null, implementation_fee ?? null,
-       contract_months ?? null, go_live_date ?? null,
+       contract_months ?? null, payment_terms ?? null, go_live_date ?? null,
        commercial_notes ?? null,
+       trial_start_date ?? null, trial_end_date ?? null, lost_reason ?? null, product_plan ?? null,
        product_type || null,
        stage_id || null, req.params.id]
     );
@@ -155,10 +158,10 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Only admins can delete deals.' });
   try {
-    const [[deal]] = await pool.execute('SELECT owner_id FROM deals WHERE id = ?', [req.params.id]);
+    const [[deal]] = await pool.execute('SELECT id FROM deals WHERE id = ?', [req.params.id]);
     if (!deal) return res.status(404).json({ error: 'Not found.' });
-    if (!canAccess(req, deal.owner_id)) return res.status(403).json({ error: 'Access denied.' });
     await pool.execute('DELETE FROM deals WHERE id = ?', [req.params.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error.' }); }

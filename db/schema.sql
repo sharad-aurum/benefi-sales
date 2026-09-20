@@ -12,10 +12,23 @@ CREATE TABLE IF NOT EXISTS users (
   role          ENUM('admin','manager','rep') NOT NULL DEFAULT 'rep',
   avatar_color  VARCHAR(7)    NOT NULL DEFAULT '#0F766E',
   is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
-  must_reset_pw BOOLEAN       NOT NULL DEFAULT FALSE,
-  last_login    DATETIME,
-  created_at    DATETIME      DEFAULT CURRENT_TIMESTAMP,
-  updated_at    DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  must_reset_pw   BOOLEAN       NOT NULL DEFAULT FALSE,
+  failed_attempts INT           NOT NULL DEFAULT 0,
+  locked_until    DATETIME,
+  last_login      DATETIME,
+  created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Login audit log
+CREATE TABLE IF NOT EXISTS login_audit (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT UNSIGNED NULL,
+  email       VARCHAR(254) NOT NULL,
+  ip_address  VARCHAR(45),
+  success     TINYINT(1) NOT NULL DEFAULT 0,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Companies
@@ -109,11 +122,17 @@ CREATE TABLE IF NOT EXISTS deals (
   discount_percent      DECIMAL(5,2),
   proposed_per_employee DECIMAL(10,2),
   offered_per_employee  DECIMAL(10,2),
+  pricing_per_user      DECIMAL(10,2),
   employees_covered     INT UNSIGNED,
   implementation_fee    DECIMAL(15,2),
   contract_months       INT UNSIGNED,
   go_live_date          DATE,
+  trial_start_date      DATE,
+  trial_end_date        DATE,
   commercial_notes      TEXT,
+  lost_reason           VARCHAR(300),
+  payment_terms         ENUM('monthly','quarterly','biyearly','yearly') NULL,
+  product_plan          VARCHAR(300),
   product_type          ENUM('bundled','hris_only') NOT NULL DEFAULT 'bundled',
   currency              CHAR(3)        NOT NULL DEFAULT 'PHP',
   probability           INT            NOT NULL DEFAULT 0,
@@ -198,6 +217,41 @@ CREATE TABLE IF NOT EXISTS quotas (
 );
 
 -- ============================================================
+-- Pricing Config
+-- ============================================================
+CREATE TABLE IF NOT EXISTS pricing_config (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  config_key   VARCHAR(100) NOT NULL UNIQUE,
+  config_value TEXT         NOT NULL,
+  label        VARCHAR(200),
+  updated_by   INT UNSIGNED NULL,
+  updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- ============================================================
+-- Seed: Pricing config
+-- ============================================================
+INSERT IGNORE INTO pricing_config (config_key, config_value, label) VALUES
+  ('list_price',               '299', 'List Price (₱/user/month)'),
+  ('fin_tool_fee',             '99',  'Financial Tool Fee (₱/user/month)'),
+  ('max_discount_pct',         '80',  'Maximum Discount Ceiling — Bundled (%)'),
+  ('max_discount_hris_pct',    '50',  'Maximum Discount Ceiling — HRIS Only (%)'),
+  ('vol_slab_100',             '25',  'Volume Discount: 100+ HC (%)'),
+  ('vol_slab_250',             '30',  'Volume Discount: 250+ HC (%)'),
+  ('vol_slab_500',             '35',  'Volume Discount: 500+ HC (%)'),
+  ('vol_slab_1000',            '40',  'Volume Discount: 1000+ HC (%)'),
+  ('early_rank_1_25',          '20',  'Early Access Rank 1–25 (%)'),
+  ('early_rank_26_100',        '10',  'Early Access Rank 26–100 (%)'),
+  ('qualifier_discount_each',  '5',   'Per-Qualifier Discount (%)'),
+  ('fast_decision_discount',   '10',  'Fast-Decision Bonus (%)'),
+  ('fin_tool_waiver_clients',  '100', 'Fin Tool Waiver: First N Clients'),
+  ('fast_decision_days',       '30',  'Fast-Decision Window (days)'),
+  ('payment_quarterly_discount','3',  'Payment Discount: Quarterly (%)'),
+  ('payment_biyearly_discount', '5',  'Payment Discount: Semi-Annual (%)'),
+  ('payment_yearly_discount',   '8',  'Payment Discount: Annual (%)');
+
+-- ============================================================
 -- Seed: Pipeline stages
 -- ============================================================
 INSERT INTO pipeline_stages (name, display_order, probability, color, is_won, is_lost) VALUES
@@ -205,8 +259,9 @@ INSERT INTO pipeline_stages (name, display_order, probability, color, is_won, is
   ('Qualified',   2, 35,  '#3B82F6', 0, 0),
   ('Proposal',    3, 55,  '#8B5CF6', 0, 0),
   ('Negotiation', 4, 75,  '#F59E0B', 0, 0),
-  ('Closed Won',  5, 100, '#22C55E', 1, 0),
-  ('Closed Lost', 6, 0,   '#EF4444', 0, 1);
+  ('Trial',       5, 85,  '#8B5CF6', 0, 0),
+  ('Closed Won',  6, 100, '#22C55E', 1, 0),
+  ('Closed Lost', 7, 0,   '#EF4444', 0, 1);
 
 -- ============================================================
 -- Seed: Users  (passwords pre-hashed with bcrypt rounds=12)

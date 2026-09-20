@@ -1,6 +1,6 @@
 import express from 'express';
 import pool from '../db/pool.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -83,7 +83,7 @@ router.put('/:id', async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error.' }); }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.execute('DELETE FROM contacts WHERE id = ?', [req.params.id]);
     res.json({ ok: true });
