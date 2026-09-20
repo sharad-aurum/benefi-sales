@@ -457,3 +457,19 @@ select.flt{padding:7px 10px;border:1px solid var(--bd);border-radius:var(--r);ba
 .pa-section-hd{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--t3);margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--bd)}
 .btn-icon-del{background:none;border:none;color:#EF4444;cursor:pointer;font-size:11px;padding:1px 4px;border-radius:3px;line-height:1;opacity:.7}
 .btn-icon-del:hover{opacity:1;background:#FEF2F2}
+
+/* ── Pricing Reference panel ── */
+.pref-body{padding:4px 0 4px}
+.pref-group{padding:10px 16px;border-bottom:1px solid var(--bd)}
+.pref-group:last-child{border-bottom:none}
+.pref-group-hd{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:8px}
+.pref-row{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--t2);padding:3px 0;gap:8px}
+.pref-row span:first-child{flex:1;min-width:0}
+.pref-val{font-size:12.5px;font-weight:600;color:var(--t1);white-space:nowrap}
+.pref-unit{font-size:10.5px;font-weight:400;color:var(--t3);margin-left:1px}
+.pref-disc{font-size:13px;font-weight:800;color:var(--accent);white-space:nowrap;min-width:36px;text-align:right}
+.pref-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.pref-tag-green{background:#DCFCE7;color:#16A34A}
+.pref-tag-red{background:#FEF2F2;color:#DC2626}
+.pref-green{color:#16A34A}
+.pref-red{color:#DC2626}

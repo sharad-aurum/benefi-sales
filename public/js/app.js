@@ -2259,12 +2259,12 @@ window.tgtSetYear = window.tgtSetYear;
 
 // ── Pricing Dashboard ─────────────────────────────────────────────────────────
 VIEWS.pricing = async () => {
-  const [cfg, forecast, wonData] = await Promise.all([
+  const [cfg, deals, wonData] = await Promise.all([
     api.get('/api/pricing/config'),
-    api.get('/api/pricing/forecast'),
+    api.get('/api/deals'),
     api.get('/api/pricing/clients-won').catch(()=>({won_count:0})),
   ]);
-  if (!cfg || !forecast) return;
+  if (!cfg || !deals) return;
 
   const v = document.getElementById('view');
   const isAdmin = state.user?.role === 'admin';
@@ -2277,6 +2277,7 @@ VIEWS.pricing = async () => {
   const waiverClients  = c('fin_tool_waiver_clients');
   const wonCount       = Number(wonData.won_count || 0);
   const finToolWaived  = wonCount < waiverClients;
+  const openDeals      = deals.filter(d => !d.is_won && !d.is_lost);
   const customQuals    = Object.entries(cfg)
     .filter(([k]) => k.startsWith('custom_qual_'))
     .map(([k, v]) => ({ key: k, label: v.label || k, pct: Number(v.value) }));
@@ -2343,7 +2344,7 @@ VIEWS.pricing = async () => {
                   <label class="pcheck">
                     <input type="checkbox" class="pc-custom" data-pct="${q.pct}" data-key="${q.key}" onchange="pricingCalc()">
                     ${esc(q.label)} (+${q.pct}%)
-                    ${isAdmin?`<button class="btn-icon-del" title="Remove" onclick="deleteCustomQual('${q.key}')">✕</button>`:''}
+                    ${isAdmin?`<button class="btn-icon-del" title="Remove" onclick="deleteCustomQual('${q.key}')">&#x2715;</button>`:''}
                   </label>`).join('')}
               </div>
             </div>` : ''}
@@ -2361,57 +2362,12 @@ VIEWS.pricing = async () => {
               <div class="flbl" style="margin-bottom:8px">Apply Calculator Result to a Deal</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <select class="fsel" id="pc-deal-target" style="flex:1;min-width:160px">
-                  <option value="">— Select open deal —</option>
-                  ${forecast.deals.map(d=>`<option value="${d.id}">${esc(d.company_name||d.title)} · ${esc(d.stage_name||'')}</option>`).join('')}
+                  <option value="">&#x2014; Select open deal —</option>
+                  ${openDeals.map(d=>`<option value="${d.id}">${esc(d.company_name||d.title)} · ${esc(d.stage_name||'')}</option>`).join('')}
                 </select>
                 <button class="btn btn-p" onclick="applyPricingToDeal()">Apply to Deal</button>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="section" style="margin-top:20px">
-          <div class="section-hd">
-            <span class="section-title">Pipeline Revenue Forecast</span>
-            <span style="font-size:11.5px;color:var(--t3)">${forecast.deals.length} open deals</span>
-          </div>
-          <div style="padding:16px 20px">
-            <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
-              <div class="stat-card">
-                <div class="stat-lbl">Total Pipeline MRR</div>
-                <div class="stat-val">₱${Math.round(forecast.totalMrr).toLocaleString()}</div>
-                <div class="stat-sub">${forecast.totalHeadcount.toLocaleString()} employees</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-lbl">Probability-Weighted MRR</div>
-                <div class="stat-val" style="color:var(--accent)">₱${Math.round(forecast.weightedMrr).toLocaleString()}</div>
-                <div class="stat-sub">Expected monthly</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-lbl">Weighted ARR</div>
-                <div class="stat-val">₱${forecast.weightedMrr*12>=1e6?(forecast.weightedMrr*12/1e6).toFixed(1)+'M':Math.round(forecast.weightedMrr*12/1000)+'K'}</div>
-                <div class="stat-sub">12-month projection</div>
-              </div>
-            </div>
-            ${forecast.deals.length===0 ? '<div class="tbl-empty">No open deals in pipeline.</div>' : `
-            <div style="overflow-x:auto">
-              <table class="tbl">
-                <thead><tr><th>Company</th><th>Plan</th><th>Stage</th><th>HC</th><th>Rate</th><th>MRR</th><th>Prob</th><th>Wtd MRR</th></tr></thead>
-                <tbody>
-                  ${forecast.deals.map(d=>`
-                    <tr>
-                      <td class="fw-6">${esc(d.company_name||d.title)}</td>
-                      <td style="max-width:130px"><span style="font-size:11px;color:var(--t3)">${esc(d.product_plan||'—')}</span></td>
-                      <td><span class="badge" style="background:${d.stage_color||'#64748B'}22;color:${d.stage_color||'#64748B'}">${esc(d.stage_name||'—')}</span></td>
-                      <td>${d.employees_covered?Number(d.employees_covered).toLocaleString():'—'}</td>
-                      <td>${d.mrr>0?'₱'+Number(d.pricing_per_user||d.offered_per_employee||d.proposed_per_employee||0).toFixed(2):'—'}</td>
-                      <td class="fw-7">${d.mrr>0?'₱'+Math.round(d.mrr).toLocaleString():'—'}</td>
-                      <td>${d.probability}%</td>
-                      <td style="color:var(--accent)">${d.weighted_mrr>0?'₱'+Math.round(d.weighted_mrr).toLocaleString():'—'}</td>
-                    </tr>`).join('')}
-                </tbody>
-              </table>
-            </div>`}
           </div>
         </div>
       </div>
@@ -2419,24 +2375,63 @@ VIEWS.pricing = async () => {
       <div class="pricing-side">
         <div class="section">
           <div class="section-hd"><span class="section-title">Pricing Reference</span></div>
-          <div style="padding:12px 16px">
-            <div class="pricing-assumption"><span class="pa-lbl">List Price</span><span class="pa-val">₱${listPrice}/user/mo</span></div>
-            <div class="pricing-assumption"><span class="pa-lbl">Fin. Tool Fee</span><span class="pa-val">₱${finToolFee}/user/mo</span></div>
-            <div class="pricing-assumption" style="color:${finToolWaived?'#22C55E':'#EF4444'}">
-              <span class="pa-lbl">Fin. Tool Waiver</span>
-              <span class="pa-val" style="font-size:11.5px">${finToolWaived?`Active (${wonCount}/${waiverClients})`:`Expired (${wonCount})`}</span>
+          <div class="pref-body">
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Base Pricing</div>
+              <div class="pref-row"><span>List Price</span><span class="pref-val">₱${listPrice}<span class="pref-unit">/user/mo</span></span></div>
+              <div class="pref-row"><span>Financial Tool Add-on</span><span class="pref-val">₱${finToolFee}<span class="pref-unit">/user/mo</span></span></div>
+              <div class="pref-row ${finToolWaived ? 'pref-green' : 'pref-red'}">
+                <span>Fin. Tool Waiver</span>
+                <span class="pref-tag ${finToolWaived ? 'pref-tag-green' : 'pref-tag-red'}">${finToolWaived ? `Active · ${wonCount}/${waiverClients} clients` : `Expired · ${wonCount} clients`}</span>
+              </div>
             </div>
-            <div class="pricing-assumption"><span class="pa-lbl">Cap — Bundled</span><span class="pa-val">${maxDiscBundled}%</span></div>
-            <div class="pricing-assumption"><span class="pa-lbl">Cap — HRIS Only</span><span class="pa-val">${maxDiscHris}%</span></div>
-            <div class="pa-section-hd">Volume Discounts</div>
-            ${['vol_slab_100','vol_slab_250','vol_slab_500','vol_slab_1000'].map((k,i)=>`<div class="pricing-assumption"><span class="pa-lbl">${['100+','250+','500+','1000+'][i]} HC</span><span class="pa-val">${c(k)}%</span></div>`).join('')}
-            <div class="pa-section-hd">Early Access</div>
-            <div class="pricing-assumption"><span class="pa-lbl">Rank 1–25</span><span class="pa-val">${c('early_rank_1_25')}%</span></div>
-            <div class="pricing-assumption"><span class="pa-lbl">Rank 26–100</span><span class="pa-val">${c('early_rank_26_100')}%</span></div>
-            <div class="pa-section-hd">Advance Payment</div>
-            <div class="pricing-assumption"><span class="pa-lbl">Quarterly</span><span class="pa-val">${payDisc.quarterly}%</span></div>
-            <div class="pricing-assumption"><span class="pa-lbl">Semi-Annual</span><span class="pa-val">${payDisc.biyearly}%</span></div>
-            <div class="pricing-assumption"><span class="pa-lbl">Annual</span><span class="pa-val">${payDisc.yearly}%</span></div>
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Discount Caps</div>
+              <div class="pref-row"><span>Bundled (HRIS + Fin. Tool)</span><span class="pref-disc">${maxDiscBundled}%</span></div>
+              <div class="pref-row"><span>HRIS Only</span><span class="pref-disc">${maxDiscHris}%</span></div>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Volume Discounts</div>
+              ${[['100+','vol_slab_100'],['250+','vol_slab_250'],['500+','vol_slab_500'],['1,000+','vol_slab_1000']].map(([lbl,k])=>`
+              <div class="pref-row"><span>${lbl} employees</span><span class="pref-disc">${c(k)}%</span></div>`).join('')}
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Early Access</div>
+              <div class="pref-row"><span>Rank 1 – 25</span><span class="pref-disc">${c('early_rank_1_25')}%</span></div>
+              <div class="pref-row"><span>Rank 26 – 100</span><span class="pref-disc">${c('early_rank_26_100')}%</span></div>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Advance Payment</div>
+              <div class="pref-row"><span>Quarterly</span><span class="pref-disc">+${payDisc.quarterly}%</span></div>
+              <div class="pref-row"><span>Semi-Annual</span><span class="pref-disc">+${payDisc.biyearly}%</span></div>
+              <div class="pref-row"><span>Annual</span><span class="pref-disc">+${payDisc.yearly}%</span></div>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-hd">Other Discounts</div>
+              <div class="pref-row"><span>Per Qualifier</span><span class="pref-disc">${c('qualifier_discount_each')}%</span></div>
+              <div class="pref-row"><span>Fast Decision Bonus</span><span class="pref-disc">${c('fast_decision_discount')}%</span></div>
+              <div class="pref-row"><span style="color:var(--t3)">Decision Window</span><span class="pref-val">${c('fast_decision_days')} days</span></div>
+            </div>
+
+            ${customQuals.length ? `
+            <div class="pref-group">
+              <div class="pref-group-hd">Custom Qualifiers</div>
+              ${customQuals.map(q=>`
+              <div class="pref-row">
+                <span>${esc(q.label)}</span>
+                <span style="display:flex;gap:6px;align-items:center">
+                  <span class="pref-disc">${q.pct}%</span>
+                  ${isAdmin?`<button class="btn-icon-del" onclick="deleteCustomQual('${q.key}')">&#x2715;</button>`:''}
+                </span>
+              </div>`).join('')}
+            </div>` : ''}
+
           </div>
         </div>
 
@@ -2456,7 +2451,7 @@ VIEWS.pricing = async () => {
           <div class="section-hd"><span class="section-title">Custom Qualifiers</span></div>
           <div style="padding:12px 16px">
             ${customQuals.length===0?'<div style="font-size:12px;color:var(--t3);margin-bottom:8px">No custom qualifiers yet.</div>':''}
-            ${customQuals.map(q=>`<div class="pricing-assumption"><span class="pa-lbl">${esc(q.label)}</span><span style="display:flex;gap:6px;align-items:center"><span class="pa-val">${q.pct}%</span><button class="btn-icon-del" onclick="deleteCustomQual('${q.key}')">✕</button></span></div>`).join('')}
+            ${customQuals.map(q=>`<div class="pref-row" style="padding:4px 0;border-bottom:1px solid var(--bd)"><span>${esc(q.label)}</span><span style="display:flex;gap:6px;align-items:center"><span class="pref-disc">${q.pct}%</span><button class="btn-icon-del" onclick="deleteCustomQual('${q.key}')">&#x2715;</button></span></div>`).join('')}
             <div style="display:flex;gap:6px;margin-top:10px">
               <input class="finp" id="new-qual-label" placeholder="Qualifier name" style="flex:2;font-size:12px;padding:5px 8px">
               <input class="finp" id="new-qual-pct" type="number" min="0" max="50" placeholder="%" style="flex:1;font-size:12px;padding:5px 8px">
