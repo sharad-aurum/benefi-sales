@@ -68,7 +68,8 @@ ALTER TABLE deals ADD COLUMN lost_reason        VARCHAR(300)   NULL;
 ALTER TABLE deals ADD COLUMN commercial_notes   TEXT           NULL;
 ALTER TABLE deals ADD COLUMN go_live_date       DATE           NULL;
 ALTER TABLE deals ADD COLUMN payment_terms      ENUM('monthly','quarterly','biyearly','yearly') NULL;
-ALTER TABLE deals ADD COLUMN product_plan       VARCHAR(300)   NULL;
+ALTER TABLE deals ADD COLUMN product_plan             VARCHAR(300)   NULL;
+ALTER TABLE deals ADD COLUMN close_date_push_count   TINYINT UNSIGNED NOT NULL DEFAULT 0;
 
 -- ------------------------------------------------------------
 -- 4. Add Trial pipeline stage if it doesn't already exist

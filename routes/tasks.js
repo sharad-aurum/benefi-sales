@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import { notifyTaskAssigned } from '../utils/notifications.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -36,6 +37,10 @@ router.post('/', async (req, res) => {
       [title, description || null, due_date || null, priority || 'medium', assigned_to || req.user.id, deal_id || null, contact_id || null, company_id || null, req.user.id]
     );
     res.status(201).json({ id: r.insertId });
+    const assignee = assigned_to || req.user.id;
+    if (assignee !== req.user.id) {
+      notifyTaskAssigned(r.insertId, assignee, req.user.name).catch(() => {});
+    }
   } catch (err) { res.status(500).json({ error: 'Server error.' }); }
 });
 

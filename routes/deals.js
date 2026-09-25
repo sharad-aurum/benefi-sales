@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import { notifyDealCreated, notifyStageChanged, notifyDealWon, notifyDealLost, notifyCloseDatePushed } from '../utils/notifications.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -92,6 +93,7 @@ router.post('/', async (req, res) => {
        product_type || 'bundled', trial_start_date || null, trial_end_date || null, lost_reason || null, product_plan || null]
     );
     res.status(201).json({ id: r.insertId });
+    notifyDealCreated(r.insertId, req.user.name).catch(() => {});
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error.' }); }
 });
 
@@ -105,16 +107,30 @@ router.put('/:id', async (req, res) => {
   } = req.body;
   try {
     const [[deal]] = await pool.execute(
-      'SELECT owner_id, stage_id, company_id, contact_id FROM deals WHERE id = ?', [req.params.id]
+      `SELECT d.owner_id, d.stage_id, d.company_id, d.contact_id, d.expected_close_date, d.close_date_push_count,
+              ps.name AS stage_name, ps.is_won, ps.is_lost
+       FROM deals d LEFT JOIN pipeline_stages ps ON d.stage_id = ps.id WHERE d.id = ?`,
+      [req.params.id]
     );
     if (!deal) return res.status(404).json({ error: 'Not found.' });
     if (!canAccess(req, deal.owner_id)) return res.status(403).json({ error: 'Access denied.' });
-    const stageChanged = stage_id && stage_id !== deal.stage_id;
+
+    const stageChanged     = stage_id && Number(stage_id) !== Number(deal.stage_id);
+    const closeDatePushed  = expected_close_date && expected_close_date !== deal.expected_close_date?.toString().slice(0, 10);
+    const oldCloseDate     = deal.expected_close_date;
+
     let prob = probability;
     if (stageChanged && prob === undefined) {
-      const [[s]] = await pool.execute('SELECT probability FROM pipeline_stages WHERE id = ?', [stage_id]);
+      const [[s]] = await pool.execute('SELECT probability, is_won, is_lost FROM pipeline_stages WHERE id = ?', [stage_id]);
       prob = s?.probability ?? 0;
     }
+
+    // Increment push count if close date moved to a later date
+    let newPushCount = deal.close_date_push_count;
+    if (closeDatePushed && expected_close_date > deal.expected_close_date?.toString().slice(0, 10)) {
+      newPushCount += 1;
+    }
+
     await pool.execute(
       `UPDATE deals SET
          title = COALESCE(?, title),
@@ -133,6 +149,7 @@ router.put('/:id', async (req, res) => {
          commercial_notes = ?,
          trial_start_date = ?, trial_end_date = ?, lost_reason = ?, product_plan = ?,
          product_type = COALESCE(?, product_type),
+         close_date_push_count = ?,
          stage_changed_at = IF(? != stage_id, NOW(), stage_changed_at)
        WHERE id = ?`,
       [title || null,
@@ -151,9 +168,21 @@ router.put('/:id', async (req, res) => {
        commercial_notes ?? null,
        trial_start_date ?? null, trial_end_date ?? null, lost_reason ?? null, product_plan ?? null,
        product_type || null,
+       newPushCount,
        stage_id || null, req.params.id]
     );
     res.json({ ok: true });
+
+    // Fire notifications after response (non-blocking)
+    if (stageChanged) {
+      const [[newStage]] = await pool.execute('SELECT name, is_won, is_lost FROM pipeline_stages WHERE id = ?', [stage_id]);
+      notifyStageChanged(req.params.id, deal.stage_name, newStage?.name).catch(() => {});
+      if (newStage?.is_won)  notifyDealWon(req.params.id).catch(() => {});
+      if (newStage?.is_lost) notifyDealLost(req.params.id).catch(() => {});
+    }
+    if (closeDatePushed && expected_close_date > oldCloseDate?.toString().slice(0, 10)) {
+      notifyCloseDatePushed(req.params.id, oldCloseDate, expected_close_date).catch(() => {});
+    }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error.' }); }
 });
 

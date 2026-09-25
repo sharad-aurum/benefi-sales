@@ -20,6 +20,7 @@ import performanceRoutes  from './routes/performance.js';
 import pricingRoutes      from './routes/pricing.js';
 import publicRoutes       from './routes/public.js';
 import enquiryRoutes      from './routes/enquiries.js';
+import { startScheduler } from './jobs/scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
@@ -56,5 +57,7 @@ app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.h
 
 app.listen(PORT, () => {
   console.log(`\n  BeneFi CRM  →  http://localhost:${PORT}`);
-  console.log(`  Login         admin@benefi.ph  /  Admin@BeneFi2026!\n`);
+  console.log(`  Login         admin@benefi.ph  /  Admin@BeneFi2026!`);
+  startScheduler();
+  console.log();
 });
