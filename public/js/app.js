@@ -1645,6 +1645,7 @@ async function init() {
     });
 
     await updateTaskBadge();
+    if (state.user?.role === 'admin') await updateEnquiryBadge();
     navigate('dashboard');
   } catch (err) {
     document.body.innerHTML = `<div style="padding:40px;color:red">Failed to start: ${err.message}</div>`;
@@ -2652,5 +2653,118 @@ window.deleteCustomQual = async function(key) {
   } catch(err) { toast(err.message, 'err'); }
 };
 
+
+// ── Enquiries (website leads) ─────────────────────────────────────────────────
+const ENQ_STATUS = { new:'New', contacted:'Contacted', converted:'Converted', closed:'Closed' };
+const ENQ_COLORS = { new:'#E85D26', contacted:'#3B82F6', converted:'#22C55E', closed:'#6B7280' };
+
+async function updateEnquiryBadge() {
+  try {
+    const data = await api.get('/api/enquiries?status=new&limit=999');
+    const nb = document.getElementById('nb-enquiries');
+    const n = data?.total ?? 0;
+    if (nb) { nb.textContent = n; nb.classList.toggle('show', n > 0); }
+  } catch {}
+}
+
+VIEWS.enquiries = async () => {
+  const v = document.getElementById('view');
+  v.innerHTML = `<div class="loading">Loading enquiries…</div>`;
+
+  let _status = '';
+  let _page   = 0;
+  const PAGE  = 25;
+
+  async function render() {
+    const qs = `?limit=${PAGE}&offset=${_page * PAGE}${_status ? '&status='+_status : ''}`;
+    const data = await api.get('/api/enquiries' + qs);
+    const rows = data?.rows || [];
+    const total = data?.total ?? 0;
+    const pages = Math.ceil(total / PAGE);
+
+    v.innerHTML = `
+      <div class="section">
+        <div class="section-hd" style="flex-wrap:wrap;gap:8px">
+          <span class="section-title">Website Enquiries</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
+            ${['','new','contacted','converted','closed'].map(s=>`
+              <button onclick="window._enqFilter('${s}')"
+                style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--bd);cursor:pointer;
+                       background:${_status===s?'var(--accent)':'var(--bg2)'};
+                       color:${_status===s?'#fff':'var(--t2)'}">
+                ${s ? ENQ_STATUS[s] : 'All'}
+              </button>`).join('')}
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="crm-table">
+            <thead><tr>
+              <th>Name</th><th>Company</th><th>Email</th><th>Phone</th>
+              <th>Message</th><th>Status</th><th>Received</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+              ${rows.length ? rows.map(r => `
+                <tr>
+                  <td class="fw-6">${esc(r.name)}</td>
+                  <td>${esc(r.company)}</td>
+                  <td><a href="mailto:${esc(r.email)}" style="color:var(--accent)">${esc(r.email)}</a></td>
+                  <td>${esc(r.phone||'—')}</td>
+                  <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(r.message||'')}">${esc(r.message||'—')}</td>
+                  <td>
+                    <span class="badge" style="background:${ENQ_COLORS[r.status]}22;color:${ENQ_COLORS[r.status]}">
+                      ${ENQ_STATUS[r.status]||r.status}
+                    </span>
+                  </td>
+                  <td style="white-space:nowrap;color:var(--t3)">${fmtDate(r.created_at)}</td>
+                  <td>
+                    <button class="btn-sm" onclick="window._enqEdit(${r.id},'${r.status}',${JSON.stringify(r.notes||'').replace(/</g,'&lt;')})">Update</button>
+                  </td>
+                </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:32px">No enquiries found</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        ${pages > 1 ? `<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 20px;font-size:13px;color:var(--t2)">
+          <button class="btn-sm" onclick="window._enqPage(${_page-1})" ${_page===0?'disabled':''}>← Prev</button>
+          <span>Page ${_page+1} of ${pages} &nbsp;(${total} total)</span>
+          <button class="btn-sm" onclick="window._enqPage(${_page+1})" ${_page>=pages-1?'disabled':''}>Next →</button>
+        </div>` : ''}
+      </div>`;
+  }
+
+  window._enqFilter = s => { _status = s; _page = 0; render(); };
+  window._enqPage   = p => { _page = p; render(); };
+
+  window._enqEdit = (id, currentStatus, currentNotes) => {
+    openModal('Update Enquiry',
+      `<div class="fgrid">
+        <div class="fg" style="grid-column:1/-1">
+          <label class="flbl">Status</label>
+          <select class="fsel" id="enq-status">
+            ${Object.entries(ENQ_STATUS).map(([k,l])=>`<option value="${k}" ${k===currentStatus?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label class="flbl">Notes</label>
+          <textarea class="finp" id="enq-notes" rows="3" style="resize:vertical">${esc(currentNotes)}</textarea>
+        </div>
+      </div>`,
+      `<button class="btn" onclick="window._enqSave(${id})">Save</button>`
+    );
+  };
+
+  window._enqSave = async id => {
+    const status = document.getElementById('enq-status')?.value;
+    const notes  = document.getElementById('enq-notes')?.value;
+    try {
+      await api.put('/api/enquiries/'+id, { status, notes });
+      toast('Enquiry updated');
+      closeModal();
+      await updateEnquiryBadge();
+      render();
+    } catch(err) { toast(err.message, 'err'); }
+  };
+
+  await render();
+};
 
 init();
