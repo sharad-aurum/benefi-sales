@@ -18,6 +18,8 @@ import reportRoutes    from './routes/reports.js';
 import partnerRoutes      from './routes/partners.js';
 import performanceRoutes  from './routes/performance.js';
 import pricingRoutes      from './routes/pricing.js';
+import publicRoutes       from './routes/public.js';
+import enquiryRoutes      from './routes/enquiries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
@@ -28,6 +30,11 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Public enquiry endpoint — open CORS for benefi.ph website form
+const publicCors = cors({ origin: ['https://benefi.ph', 'https://www.benefi.ph', 'http://localhost:3000'], methods: ['POST'] });
+app.options('/api/public/enquiry', publicCors);
+app.use('/api/public', publicCors, publicRoutes);
 
 app.use('/api/auth',       authRoutes);
 app.use('/api/users',      userRoutes);
@@ -41,6 +48,7 @@ app.use('/api/reports',    reportRoutes);
 app.use('/api/partners',     partnerRoutes);
 app.use('/api/performance',  performanceRoutes);
 app.use('/api/pricing',      pricingRoutes);
+app.use('/api/enquiries',    enquiryRoutes);
 
 // SPA — all non-API routes serve the login or app page
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));

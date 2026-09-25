@@ -5,6 +5,24 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- 0. Create enquiries table (website Early Access form leads)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS enquiries (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name         VARCHAR(200)  NOT NULL,
+  email        VARCHAR(254)  NOT NULL,
+  company      VARCHAR(300)  NOT NULL,
+  phone        VARCHAR(50),
+  message      TEXT,
+  ip_address   VARCHAR(45),
+  source       VARCHAR(100)  DEFAULT 'website',
+  status       ENUM('new','contacted','converted','closed') NOT NULL DEFAULT 'new',
+  notes        TEXT,
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------
 -- 1. Create pricing_config table (skip if already exists)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pricing_config (
