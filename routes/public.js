@@ -58,7 +58,7 @@ router.post('/enquiry', async (req, res) => {
 
   // Send notification email (non-fatal)
   if (mailer) {
-    const notifyTo = process.env.SMTP_NOTIFY_TO || process.env.SMTP_USER;
+    const notifyTo = process.env.ENQUIRY_NOTIFY_TO || process.env.SMTP_NOTIFY_TO || process.env.SMTP_USER;
     try {
       await mailer.sendMail({
         from:    `"BeneFi Website" <${process.env.SMTP_USER}>`,
