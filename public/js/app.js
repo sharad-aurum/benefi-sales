@@ -306,6 +306,7 @@ function renderPipeContent(){
   if(mode==='kanban'){
     // Kanban: show ALL stages (including won/lost), filter deals by rep+horizon
     const deals = filterDeals(_pipeDeals||[], false);
+    const CARD_LIMIT = 10;
     c.style.cssText='overflow:auto;flex:1';
     c.innerHTML = `<div class="pipe-wrap"><div class="pipe">
       ${stages.map(s=>{
@@ -313,6 +314,8 @@ function renderPipeContent(){
         const tot = sd.reduce((a,d)=>a+Number(d.value),0);
         const emps = sd.reduce((a,d)=>a+Number(d.employees_covered||0),0);
         const wonLostCls = isWon(s)?'scol-won':isLost(s)?'scol-lost':'';
+        const visible = sd.slice(0, CARD_LIMIT);
+        const extra   = sd.slice(CARD_LIMIT);
         return `<div class="scol ${wonLostCls}">
           <div class="scol-hd">
             <div class="sdot" style="background:${s.color}"></div>
@@ -323,7 +326,21 @@ function renderPipeContent(){
           ${emps>0?`<div class="scol-emp">👥 ${emps.toLocaleString()} employees</div>`:''}
           <div class="scards" data-stage="${s.id}"
             ondragover="pDov(event)" ondragleave="pDlv(event)" ondrop="pDrp(event,${s.id})">
-            ${sd.length===0?'<div class="empty-col">Drop deals here</div>':sd.map(d=>dealCard(d,s)).join('')}
+            ${sd.length===0?'<div class="empty-col">Drop deals here</div>':
+              visible.map(d=>dealCard(d,s)).join('') +
+              (extra.length ? `
+                <div id="scol-x-${s.id}" style="display:none;flex-direction:column;gap:7px">
+                  ${extra.map(d=>dealCard(d,s)).join('')}
+                </div>
+                <button class="scol-more-btn" onclick="
+                  var x=document.getElementById('scol-x-${s.id}');
+                  var sc=x.closest('.scards');
+                  x.style.cssText='display:flex;flex-direction:column;gap:7px';
+                  this.remove();
+                  sc.scrollTop=0;
+                ">+ ${extra.length} more deal${extra.length===1?'':'s'}</button>
+              ` : '')
+            }
           </div>
         </div>`;
       }).join('')}
@@ -503,22 +520,28 @@ window.setPipeMode = setPipeMode;
 
 function prodBadge(d){ return d.product_type==='hris_only'?'<span class="pt-badge hris-only">HRIS Only</span>':''; }
 function dealCard(d, s) {
-  const cc = closeCls(d.expected_close_date);
-  const pc = isWon(s)?'#22C55E':isLost(s)?'#EF4444':s.color;
-  const hc = d.employees_covered ? `<span class="dc-hc">👥 ${Number(d.employees_covered).toLocaleString()} emp</span>` : '';
+  const cc   = closeCls(d.expected_close_date);
+  const pc   = isWon(s)?'#22C55E':isLost(s)?'#EF4444':s.color;
+  const val  = Number(d.value);
+  const hc   = d.employees_covered ? `<span class="dc-hc">👥 ${Number(d.employees_covered).toLocaleString()} emp</span>` : '';
   const pepm = d.proposed_per_employee ? `<span class="dc-pepm">₱${Number(d.proposed_per_employee).toFixed(0)}/emp/mo</span>` : '';
+  const co   = esc(d.company_name||'No company');
+  const tt   = esc(d.title||'');
+  // Show title row only if it differs from company name (avoid redundancy)
+  const showTt = tt && tt.toLowerCase() !== co.toLowerCase();
+  const hasFooter = d.owner_name || d.expected_close_date;
   return `<div class="dcard" draggable="true" data-id="${d.id}"
     ondragstart="pDs(event,${d.id})" ondragend="pDe(event)" onclick="if(Date.now()-dragEndTime>250) openDealDetail(${d.id})">
     <div class="dcard-bar" style="background:${s.color}"></div>
-    <div class="dc-co">${esc(d.company_name||'No company')} ${prodBadge(d)}</div>
-    <div class="dc-tt">${esc(d.title)}</div>
-    <div class="dc-val">${fmt(d.value)}</div>
+    <div class="dc-co">${co} ${prodBadge(d)}</div>
+    ${showTt ? `<div class="dc-tt">${tt}</div>` : ''}
+    ${val>0 ? `<div class="dc-val">${fmt(val)}</div>` : ''}
     ${(hc||pepm)?`<div class="dc-hc-row">${hc}${pepm}</div>`:''}
-    <div class="dc-ft">
+    ${hasFooter ? `<div class="dc-ft">
       ${av(d.owner_name, d.owner_color)}
-      <div class="dc-own">${esc(d.owner_name)}</div>
+      <div class="dc-own">${esc(d.owner_name||'')}</div>
       <div class="dc-date ${cc}">${fmtDate(d.expected_close_date)}</div>
-    </div>
+    </div>` : ''}
     <div class="pbar"><div class="pfill" style="width:${d.probability}%;background:${pc}"></div></div>
   </div>`;
 }
