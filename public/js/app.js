@@ -62,7 +62,7 @@ function closeModal(e) {
 window.closeModal = closeModal;
 
 // ── Router ───────────────────────────────────────────────────────────────────
-const VIEW_TITLES = { dashboard:'Dashboard', pipeline:'Pipeline', deals:'Deals', contacts:'Contacts', companies:'Companies', activities:'Activities', tasks:'Tasks', reports:'Reports', partners:'Partners', users:'Users', performance:'My Performance', team:'Team Performance', targets:'Target Dashboard', pricing:'Pricing Dashboard' };
+const VIEW_TITLES = { dashboard:'Dashboard', pipeline:'Pipeline', deals:'Deals', contacts:'Contacts', companies:'Companies', activities:'Activities', tasks:'Tasks', reports:'Reports', partners:'Partners', users:'Users', performance:'My Performance', team:'Team Performance', targets:'Target Dashboard', pricing:'Pricing Dashboard', enquiries:'Enquiries' };
 
 const ROLE_LABELS  = { influencer:'Influencer', decision_maker:'Decision Maker', champion:'Champion', end_user:'End User', other:'Other' };
 const ROLE_COLORS  = { influencer:'#3B82F6', decision_maker:'#DC2626', champion:'#0F766E', end_user:'#9CA3AF', other:'#9CA3AF' };
@@ -2658,6 +2658,9 @@ window.deleteCustomQual = async function(key) {
 const ENQ_STATUS = { new:'New', contacted:'Contacted', converted:'Converted', closed:'Closed' };
 const ENQ_COLORS = { new:'#E85D26', contacted:'#3B82F6', converted:'#22C55E', closed:'#6B7280' };
 
+// Store enquiry rows by id so onclick can look up data without HTML-escaping issues
+const _enqStore = {};
+
 async function updateEnquiryBadge() {
   try {
     const data = await api.get('/api/enquiries?status=new&limit=999');
@@ -2676,79 +2679,85 @@ VIEWS.enquiries = async () => {
   const PAGE  = 25;
 
   async function render() {
-    const qs = `?limit=${PAGE}&offset=${_page * PAGE}${_status ? '&status='+_status : ''}`;
-    const data = await api.get('/api/enquiries' + qs);
-    const rows = data?.rows || [];
+    const qs = `/api/enquiries?limit=${PAGE}&offset=${_page * PAGE}${_status ? '&status='+_status : ''}`;
+    const data = await api.get(qs);
+    const rows  = data?.rows || [];
     const total = data?.total ?? 0;
     const pages = Math.ceil(total / PAGE);
 
+    rows.forEach(r => { _enqStore[r.id] = r; });
+
+    const filterBtns = ['','new','contacted','converted','closed'].map(s => `
+      <button onclick="window._enqFilter('${s}')" class="enq-tab${_status===s?'-active':''}">
+        ${s ? ENQ_STATUS[s] : 'All'}
+      </button>`).join('');
+
+    const cards = rows.length
+      ? rows.map(r => `
+          <div class="enq-card" onclick="window._enqEdit(${r.id})">
+            <div class="enq-card-left">
+              <div class="enq-name">${esc(r.name)}</div>
+              <div class="enq-company">${esc(r.company)}</div>
+              <div class="enq-contact-row">
+                <a href="mailto:${esc(r.email)}" onclick="event.stopPropagation()" class="enq-email">${esc(r.email)}</a>
+                ${r.phone ? `<span class="enq-phone">${esc(r.phone)}</span>` : ''}
+              </div>
+            </div>
+            <div class="enq-card-mid">
+              ${r.message ? `<div class="enq-msg">${esc(r.message)}</div>` : ''}
+              ${r.notes ? `<div class="enq-note">📝 ${esc(r.notes)}</div>` : ''}
+            </div>
+            <div class="enq-card-right">
+              <span class="enq-status-badge" style="background:${ENQ_COLORS[r.status]}18;color:${ENQ_COLORS[r.status]};border:1px solid ${ENQ_COLORS[r.status]}40">
+                ${ENQ_STATUS[r.status]||r.status}
+              </span>
+              <div class="enq-date">${fmtDate(r.created_at)}</div>
+            </div>
+          </div>`).join('')
+      : `<div style="text-align:center;color:var(--t3);padding:60px 0;font-size:14px">No enquiries found</div>`;
+
     v.innerHTML = `
-      <div class="section">
-        <div class="section-hd" style="flex-wrap:wrap;gap:8px">
-          <span class="section-title">Website Enquiries</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
-            ${['','new','contacted','converted','closed'].map(s=>`
-              <button onclick="window._enqFilter('${s}')"
-                style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--bd);cursor:pointer;
-                       background:${_status===s?'var(--accent)':'var(--bg2)'};
-                       color:${_status===s?'#fff':'var(--t2)'}">
-                ${s ? ENQ_STATUS[s] : 'All'}
-              </button>`).join('')}
-          </div>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="crm-table">
-            <thead><tr>
-              <th>Name</th><th>Company</th><th>Email</th><th>Phone</th>
-              <th>Message</th><th>Status</th><th>Received</th><th>Actions</th>
-            </tr></thead>
-            <tbody>
-              ${rows.length ? rows.map(r => `
-                <tr>
-                  <td class="fw-6">${esc(r.name)}</td>
-                  <td>${esc(r.company)}</td>
-                  <td><a href="mailto:${esc(r.email)}" style="color:var(--accent)">${esc(r.email)}</a></td>
-                  <td>${esc(r.phone||'—')}</td>
-                  <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(r.message||'')}">${esc(r.message||'—')}</td>
-                  <td>
-                    <span class="badge" style="background:${ENQ_COLORS[r.status]}22;color:${ENQ_COLORS[r.status]}">
-                      ${ENQ_STATUS[r.status]||r.status}
-                    </span>
-                  </td>
-                  <td style="white-space:nowrap;color:var(--t3)">${fmtDate(r.created_at)}</td>
-                  <td>
-                    <button class="btn-sm" onclick="window._enqEdit(${r.id},'${r.status}',${JSON.stringify(r.notes||'').replace(/</g,'&lt;')})">Update</button>
-                  </td>
-                </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:32px">No enquiries found</td></tr>`}
-            </tbody>
-          </table>
-        </div>
-        ${pages > 1 ? `<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 20px;font-size:13px;color:var(--t2)">
+      <div class="enq-toolbar">
+        <div class="enq-count">${total} enquir${total===1?'y':'ies'}</div>
+        <div class="enq-filters">${filterBtns}</div>
+      </div>
+      <div class="enq-list">${cards}</div>
+      ${pages > 1 ? `
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 24px;font-size:13px;color:var(--t2)">
           <button class="btn-sm" onclick="window._enqPage(${_page-1})" ${_page===0?'disabled':''}>← Prev</button>
-          <span>Page ${_page+1} of ${pages} &nbsp;(${total} total)</span>
+          <span>Page ${_page+1} of ${pages}</span>
           <button class="btn-sm" onclick="window._enqPage(${_page+1})" ${_page>=pages-1?'disabled':''}>Next →</button>
-        </div>` : ''}
-      </div>`;
+        </div>` : ''}`;
   }
 
   window._enqFilter = s => { _status = s; _page = 0; render(); };
   window._enqPage   = p => { _page = p; render(); };
 
-  window._enqEdit = (id, currentStatus, currentNotes) => {
-    openModal('Update Enquiry',
-      `<div class="fgrid">
-        <div class="fg" style="grid-column:1/-1">
-          <label class="flbl">Status</label>
-          <select class="fsel" id="enq-status">
-            ${Object.entries(ENQ_STATUS).map(([k,l])=>`<option value="${k}" ${k===currentStatus?'selected':''}>${l}</option>`).join('')}
-          </select>
-        </div>
-        <div class="fg" style="grid-column:1/-1">
-          <label class="flbl">Notes</label>
-          <textarea class="finp" id="enq-notes" rows="3" style="resize:vertical">${esc(currentNotes)}</textarea>
-        </div>
-      </div>`,
-      `<button class="btn" onclick="window._enqSave(${id})">Save</button>`
+  window._enqEdit = id => {
+    const r = _enqStore[id];
+    if (!r) return;
+    showModal('Update Enquiry — ' + esc(r.name),
+      `<div style="margin-bottom:14px;padding:12px 14px;background:var(--s2);border-radius:8px;font-size:13px">
+         <div class="fw-6">${esc(r.name)} · ${esc(r.company)}</div>
+         <div style="color:var(--t3);margin-top:4px">${esc(r.email)}${r.phone?' · '+esc(r.phone):''}</div>
+         ${r.message ? `<div style="margin-top:8px;color:var(--t2);border-top:1px solid var(--bd);padding-top:8px">${esc(r.message)}</div>` : ''}
+       </div>
+       <div class="fgrid">
+         <div class="fg" style="grid-column:1/-1">
+           <label class="flbl">Status</label>
+           <select class="fsel" id="enq-status">
+             ${Object.entries(ENQ_STATUS).map(([k,l])=>`<option value="${k}" ${k===r.status?'selected':''}>${l}</option>`).join('')}
+           </select>
+         </div>
+         <div class="fg" style="grid-column:1/-1">
+           <label class="flbl">Internal Notes</label>
+           <textarea class="finp" id="enq-notes" rows="3" placeholder="Add notes about this lead…" style="resize:vertical">${esc(r.notes||'')}</textarea>
+         </div>
+       </div>`,
+      `<div></div><div class="modal-ft-right">
+         <button class="btn btn-g" onclick="closeModal()">Cancel</button>
+         <button class="btn btn-p" onclick="window._enqSave(${id})">Save</button>
+       </div>`
     );
   };
 
@@ -2757,6 +2766,8 @@ VIEWS.enquiries = async () => {
     const notes  = document.getElementById('enq-notes')?.value;
     try {
       await api.put('/api/enquiries/'+id, { status, notes });
+      // Update local cache
+      if (_enqStore[id]) { _enqStore[id].status = status; _enqStore[id].notes = notes; }
       toast('Enquiry updated');
       closeModal();
       await updateEnquiryBadge();
