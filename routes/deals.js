@@ -115,9 +115,17 @@ router.put('/:id', async (req, res) => {
     if (!deal) return res.status(404).json({ error: 'Not found.' });
     if (!canAccess(req, deal.owner_id)) return res.status(403).json({ error: 'Access denied.' });
 
-    const stageChanged     = stage_id && Number(stage_id) !== Number(deal.stage_id);
-    const closeDatePushed  = expected_close_date && expected_close_date !== deal.expected_close_date?.toString().slice(0, 10);
-    const oldCloseDate     = deal.expected_close_date;
+    const stageChanged = stage_id && Number(stage_id) !== Number(deal.stage_id);
+
+    // MySQL returns DATE columns as JS Date objects — normalise to YYYY-MM-DD string
+    const existingCloseDate = deal.expected_close_date
+      ? (deal.expected_close_date instanceof Date
+          ? deal.expected_close_date.toISOString().slice(0, 10)
+          : String(deal.expected_close_date).slice(0, 10))
+      : null;
+
+    const closeDatePushed = expected_close_date && expected_close_date !== existingCloseDate;
+    const oldCloseDate    = existingCloseDate;
 
     let prob = probability;
     if (stageChanged && prob === undefined) {
@@ -125,9 +133,9 @@ router.put('/:id', async (req, res) => {
       prob = s?.probability ?? 0;
     }
 
-    // Increment push count if close date moved to a later date
+    // Increment push count only when date is moved to a later date
     let newPushCount = deal.close_date_push_count;
-    if (closeDatePushed && expected_close_date > deal.expected_close_date?.toString().slice(0, 10)) {
+    if (closeDatePushed && existingCloseDate && expected_close_date > existingCloseDate) {
       newPushCount += 1;
     }
 
